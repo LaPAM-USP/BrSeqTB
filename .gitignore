@@ -1,0 +1,130 @@
+############################################################
+# Nextflow runtime
+############################################################
+work/
+.nextflow/
+.nextflow.log*
+.init.done
+nxf-tmp*
+
+############################################################
+# Micromamba runtime (NÃO versionar)
+############################################################
+.micromamba/
+.mamba/
+
+############################################################
+# Logs (keep directory, ignore contents)
+############################################################
+logs/*
+!logs/.gitkeep
+
+############################################################
+# Runtime data (NÃO versionar)
+############################################################
+
+# Sequencing data (keep directory, ignore contents)
+reads/*
+!reads/.gitkeep
+
+# Real user inputs (allow only template)
+input/*
+!input/input_table.xlsx
+
+# Analysis outputs
+results/
+
+# Generated manifest file
+manifest.tsv
+
+############################################################
+# Tool runtime directories (generated during pipeline run)
+############################################################
+bwa/
+cohort/
+delly/
+fastqc/
+gatk/
+iqtree/
+kaiju/
+lineage/
+lofreq/
+mixInfection/
+norm/
+ntmFilter/
+resistance/
+snpMatrix/
+snpeff/
+tbdrRCov/
+transmission/
+trimmomatic/
+
+############################################################
+# Databases
+############################################################
+
+# Kaiju database (keep structure, ignore contents)
+database/kaiju/*
+!database/kaiju/
+!database/kaiju/db/
+database/kaiju/db/*
+!database/kaiju/db/.gitkeep
+
+# MTB reference: ignore everything first
+database/mtbRef/*
+
+# Keep only required reference source files
+!database/mtbRef/NC0009623.fasta
+!database/mtbRef/sequences.fa
+!database/mtbRef/genes.gff
+!database/mtbRef/forbidden_genes.txt
+
+############################################################
+# OS / editor junk
+############################################################
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*.tmp
+
+############################################################
+# Python caches
+############################################################
+__pycache__/
+*.pyc
+*.pyo
+
+############################################################
+# Env files / conda artifacts (NÃO versionar)
+############################################################
+.env
+*.conda
+*.mamba
+
+############################################################
+# Keep OMS catalog
+############################################################
+# OMS catalog: ignore everything first
+database/omsCatalog/*
+
+# Keep only original WHO catalog file
+!database/omsCatalog/WHO-UCN-TB-2023.7-eng.xlsx
+
+############################################################
+# Assets (keep demo + templates only)
+############################################################
+assets/*
+!assets/demo/
+!assets/templates/
+
+############################################################
+# Keep scripts and env definitions
+############################################################
+!bin/
+!bin/**
+!envs/
+!envs/**
+
+# Never version micromamba binary
+/bin/micromamba

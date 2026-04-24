@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+
+# Caminho do diretório raiz da pipeline (um nível acima de bin/)
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )/.." && pwd )"
+
+# Verifica se Nextflow está instalado
+if ! command -v nextflow &> /dev/null; then
+    echo "[ERROR] Nextflow not found in PATH."
+    exit 1
+fi
+
+# Executa pipeline
+nextflow run "${SCRIPT_DIR}/main.nf" \
+    -c "${SCRIPT_DIR}/nextflow.config" \
+    "$@"
