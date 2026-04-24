@@ -229,7 +229,7 @@ This step enables automated environment creation by Nextflow.
 
 ```bash
 git clone https://github.com/LaPAM-USP/BrSeqTB.git
-cd brseqtb
+cd BrSeqTB
 bash install.sh
 source ~/.bashrc
 ```
