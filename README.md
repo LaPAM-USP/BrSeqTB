@@ -228,7 +228,7 @@ This step enables automated environment creation by Nextflow.
 ## 4️⃣ Clone the Repository
 
 ```bash
-git clone https://github.com/nailasoler/brseqtb.git
+git clone https://github.com/LaPAM-USP/BrSeqTB.git
 cd brseqtb
 bash install.sh
 source ~/.bashrc
