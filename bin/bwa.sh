@@ -106,11 +106,30 @@ samtools index "$FINAL_BAM"
 samtools flagstat "$FINAL_BAM" > "$FLAGSTAT_FILE"
 
 # ===================== METRICS =====================
-total_reads=$(grep "in total" "$FLAGSTAT_FILE" | awk '{print $1}')
-mapped_reads=$(grep " mapped (" "$FLAGSTAT_FILE" | awk '{print $1}')
-mapped_pct=$(grep " mapped (" "$FLAGSTAT_FILE" | sed 's/.*(\(.*%\).*/\1/')
-paired_pct=$(grep "properly paired (" "$FLAGSTAT_FILE" | sed 's/.*(\(.*%\).*/\1/')
-dup_pct=$(grep " duplicates" "$FLAGSTAT_FILE" | sed 's/.*(\(.*%\).*/\1/')
+total_reads=$(awk '/in total/ {print $1; exit}' "$FLAGSTAT_FILE")
+
+mapped_reads=$(awk '/primary mapped/ {print $1; exit}' "$FLAGSTAT_FILE")
+mapped_pct=$(awk '/primary mapped/ {
+    match($0, /\(([0-9.]+)%/, a);
+    print a[1] "%"
+    exit
+}' "$FLAGSTAT_FILE")
+
+paired_pct=$(awk '/properly paired/ {
+    match($0, /\(([0-9.]+)%/, a);
+    print a[1] "%"
+    exit
+}' "$FLAGSTAT_FILE")
+
+dup_pct=$(awk '/primary duplicates/ {
+    print $1
+    exit
+}' "$FLAGSTAT_FILE")
+
+dup_total=$(awk '/primary/ {primary=$1} /primary duplicates/ {dup=$1} END {
+    if (primary > 0) printf "%.2f%%", (dup/primary)*100;
+    else print "0.00%"
+}' "$FLAGSTAT_FILE")
 
 coverage_pct=$(samtools coverage "$FINAL_BAM" 2>/dev/null | awk 'NR==2 {print $6}')
 [[ -z "$coverage_pct" ]] && coverage_pct="0.00"
@@ -124,7 +143,7 @@ if (( $(echo "$mapped_value < $MIN_MAPPED" | bc -l) )) || \
     status="FAIL"
 fi
 
-echo "${BIOSAMPLE},${BIOSAMPLE}.bam,${total_reads},${mapped_reads},${mapped_pct},${dup_pct},${paired_pct},${coverage_pct},${status}" >> "$SUMMARY_CSV"
+echo "${BIOSAMPLE},${BIOSAMPLE}.bam,${total_reads},${mapped_reads},${mapped_pct},${dup_total},${paired_pct},${coverage_pct},${status}" >> "$SUMMARY_CSV"
 
 rm -rf "$TMP_DIR"
 
