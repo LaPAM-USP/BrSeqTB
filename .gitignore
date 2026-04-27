@@ -116,7 +116,9 @@ database/omsCatalog/*
 ############################################################
 assets/*
 !assets/demo/
+!assets/demo/**
 !assets/templates/
+!assets/templates/**
 
 ############################################################
 # Keep scripts and env definitions
