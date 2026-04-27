@@ -75,16 +75,17 @@ mkdir -p "$TMP_DIR"
 
 RAW_BAM="${TMP_DIR}/${BIOSAMPLE}.raw.bam"
 SORTED_BAM="${TMP_DIR}/${BIOSAMPLE}.sorted.bam"
-NAMED_BAM="${TMP_DIR}/${BIOSAMPLE}.named.bam"
 FINAL_BAM="${OUTPUT_DIR}/${BIOSAMPLE}.bam"
 METRICS_FILE="${TMP_DIR}/${BIOSAMPLE}_dupMetrics.txt"
 FLAGSTAT_FILE="${TMP_DIR}/${BIOSAMPLE}_flagstat.txt"
 
 echo "[RUN] Mapping ${BIOSAMPLE} with ${THREADS} threads..."
 
-# ===================== MAPPING =====================
-bwa mem -t "$THREADS" "$REF" "$R1_FILE" "$R2_FILE" \
-| samtools view -bS - > "$RAW_BAM"
+# ===================== MAPPING and ADD READ GROUPS (up-to-date)=====================
+bwa mem -t "$THREADS" \
+  -R "@RG\tID:${BIOSAMPLE}\tSM:${BIOSAMPLE}\tPL:ILLUMINA\tLB:${BIOSAMPLE}\tPU:unit1" \
+  "$REF" "$R1_FILE" "$R2_FILE" \
+| samtools view -b - > "$RAW_BAM"
 
 # ===================== SORT =====================
 samtools sort -@ "$THREADS" "$RAW_BAM" -o "$SORTED_BAM"
@@ -92,20 +93,9 @@ rm -f "$RAW_BAM"
 
 samtools index "$SORTED_BAM"
 
-# ===================== ADD READ GROUPS =====================
-picard AddOrReplaceReadGroups \
-    I="$SORTED_BAM" \
-    O="$NAMED_BAM" \
-    RGID=1 \
-    RGLB="$BIOSAMPLE" \
-    RGPL=ILLUMINA \
-    RGPU=unit1 \
-    RGSM="$BIOSAMPLE" \
-    VALIDATION_STRINGENCY=LENIENT
-
 # ===================== MARK DUPLICATES =====================
 picard MarkDuplicates \
-    I="$NAMED_BAM" \
+    I="$SORTED_BAM" \
     O="$FINAL_BAM" \
     M="$METRICS_FILE" \
     VALIDATION_STRINGENCY=LENIENT
