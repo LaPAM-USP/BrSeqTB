@@ -85,7 +85,7 @@ def read_biosamples_from_table(table_path: str) -> List[str]:
         die("Input table has no header.")
 
     reader.fieldnames = [
-        h.strip().lstrip("\ufeff") if h is not None else h
+        h.strip().lstrip("\ufeff").strip('"\'') if h is not None else h
         for h in reader.fieldnames
     ]
 
@@ -95,7 +95,7 @@ def read_biosamples_from_table(table_path: str) -> List[str]:
     biosamples: List[str] = []
 
     for i, row in enumerate(reader, start=2):
-        s = (row.get("Biosample") or "").strip()
+        s = (row.get("Biosample") or "").strip().strip('"\'')
 
         if not s:
             die(f"Missing required Biosample value in input table at line {i}.")
