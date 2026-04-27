@@ -1,0 +1,59 @@
+Using GATK jar /home/nailasoler/gatk-4.4.0.0/gatk-package-4.4.0.0-local.jar
+Running:
+    java -Dsamjdk.use_async_io_read_samtools=false -Dsamjdk.use_async_io_write_samtools=true -Dsamjdk.use_async_io_write_tribble=false -Dsamjdk.compression_level=2 -jar /home/nailasoler/gatk-4.4.0.0/gatk-package-4.4.0.0-local.jar HaplotypeCaller -R mtbRef/NC0009623.fasta -I bwa/SRR34768879/SRR34768879.bam -O gatk/SRR34768879/SRR34768879_gatk.vcf.gz --max-mnp-distance 1 -A FisherStrand -A StrandOddsRatio -A QualByDepth -A MappingQualityRankSumTest -A ReadPosRankSumTest -A DepthPerAlleleBySample -A Coverage
+18:32:23.729 INFO  NativeLibraryLoader - Loading libgkl_compression.so from jar:file:/home/nailasoler/gatk-4.4.0.0/gatk-package-4.4.0.0-local.jar!/com/intel/gkl/native/libgkl_compression.so
+18:32:23.782 INFO  HaplotypeCaller - ------------------------------------------------------------
+18:32:23.785 INFO  HaplotypeCaller - The Genome Analysis Toolkit (GATK) v4.4.0.0
+18:32:23.785 INFO  HaplotypeCaller - For support and documentation go to https://software.broadinstitute.org/gatk/
+18:32:23.785 INFO  HaplotypeCaller - Executing as nailasoler@a21 on Linux v5.15.0-139-generic amd64
+18:32:23.786 INFO  HaplotypeCaller - Java runtime: OpenJDK 64-Bit Server VM v21.0.7+6-Ubuntu-0ubuntu120.04
+18:32:23.786 INFO  HaplotypeCaller - Start Date/Time: 16 de novembro de 2025 18:32:23 BRT
+18:32:23.786 INFO  HaplotypeCaller - ------------------------------------------------------------
+18:32:23.786 INFO  HaplotypeCaller - ------------------------------------------------------------
+18:32:23.787 INFO  HaplotypeCaller - HTSJDK Version: 3.0.5
+18:32:23.787 INFO  HaplotypeCaller - Picard Version: 3.0.0
+18:32:23.787 INFO  HaplotypeCaller - Built for Spark Version: 3.3.1
+18:32:23.787 INFO  HaplotypeCaller - HTSJDK Defaults.COMPRESSION_LEVEL : 2
+18:32:23.788 INFO  HaplotypeCaller - HTSJDK Defaults.USE_ASYNC_IO_READ_FOR_SAMTOOLS : false
+18:32:23.788 INFO  HaplotypeCaller - HTSJDK Defaults.USE_ASYNC_IO_WRITE_FOR_SAMTOOLS : true
+18:32:23.788 INFO  HaplotypeCaller - HTSJDK Defaults.USE_ASYNC_IO_WRITE_FOR_TRIBBLE : false
+18:32:23.788 INFO  HaplotypeCaller - Deflater: IntelDeflater
+18:32:23.788 INFO  HaplotypeCaller - Inflater: IntelInflater
+18:32:23.788 INFO  HaplotypeCaller - GCS max retries/reopens: 20
+18:32:23.789 INFO  HaplotypeCaller - Requester pays: disabled
+18:32:23.789 INFO  HaplotypeCaller - Initializing engine
+18:32:23.981 INFO  HaplotypeCaller - Done initializing engine
+18:32:23.988 INFO  HaplotypeCallerEngine - Disabling physical phasing, which is supported only for reference-model confidence output
+18:32:24.001 INFO  NativeLibraryLoader - Loading libgkl_utils.so from jar:file:/home/nailasoler/gatk-4.4.0.0/gatk-package-4.4.0.0-local.jar!/com/intel/gkl/native/libgkl_utils.so
+18:32:24.003 INFO  NativeLibraryLoader - Loading libgkl_pairhmm_omp.so from jar:file:/home/nailasoler/gatk-4.4.0.0/gatk-package-4.4.0.0-local.jar!/com/intel/gkl/native/libgkl_pairhmm_omp.so
+18:32:24.022 INFO  IntelPairHmm - Flush-to-zero (FTZ) is enabled when running PairHMM
+18:32:24.023 INFO  IntelPairHmm - Available threads: 20
+18:32:24.023 INFO  IntelPairHmm - Requested threads: 4
+18:32:24.023 INFO  PairHMM - Using the OpenMP multi-threaded AVX-accelerated native PairHMM implementation
+18:32:24.055 INFO  ProgressMeter - Starting traversal
+18:32:24.056 INFO  ProgressMeter -        Current Locus  Elapsed Minutes     Regions Processed   Regions/Minute
+18:32:24.645 WARN  InbreedingCoeff - InbreedingCoeff will not be calculated at position NC_000962.3:1977 and possibly subsequent; at least 10 samples must have called genotypes
+18:32:34.081 INFO  ProgressMeter -   NC_000962.3:524929              0.2                  1970          11790.5
+18:32:44.099 INFO  ProgressMeter -  NC_000962.3:1364144              0.3                  5070          15177.4
+18:32:54.108 INFO  ProgressMeter -  NC_000962.3:2116866              0.5                  7840          15653.4
+18:33:05.640 INFO  ProgressMeter -  NC_000962.3:2868433              0.7                 10640          15352.4
+18:33:15.677 INFO  ProgressMeter -  NC_000962.3:3731014              0.9                 13780          16016.7
+18:33:25.715 INFO  ProgressMeter -  NC_000962.3:4303574              1.0                 15920          15491.9
+18:33:27.266 INFO  HaplotypeCaller - 23183 read(s) filtered by: MappingQualityReadFilter 
+0 read(s) filtered by: MappingQualityAvailableReadFilter 
+0 read(s) filtered by: MappedReadFilter 
+0 read(s) filtered by: NotSecondaryAlignmentReadFilter 
+234793 read(s) filtered by: NotDuplicateReadFilter 
+0 read(s) filtered by: PassesVendorQualityCheckReadFilter 
+0 read(s) filtered by: NonZeroReferenceLengthAlignmentReadFilter 
+0 read(s) filtered by: GoodCigarReadFilter 
+0 read(s) filtered by: WellformedReadFilter 
+257976 total reads filtered out of 1984767 reads processed
+18:33:27.266 INFO  ProgressMeter -  NC_000962.3:4411170              1.1                 16332          15502.6
+18:33:27.266 INFO  ProgressMeter - Traversal complete. Processed 16332 total regions in 1.1 minutes.
+18:33:27.269 INFO  VectorLoglessPairHMM - Time spent in setup for JNI call : 0.050226941000000004
+18:33:27.270 INFO  PairHMM - Total compute time in PairHMM computeLogLikelihoods() : 5.041418291
+18:33:27.270 INFO  SmithWatermanAligner - Total compute time in java Smith-Waterman : 8.65 sec
+18:33:27.270 INFO  HaplotypeCaller - Shutting down engine
+[16 de novembro de 2025 18:33:27 BRT] org.broadinstitute.hellbender.tools.walkers.haplotypecaller.HaplotypeCaller done. Elapsed time: 1.06 minutes.
+Runtime.totalMemory()=562036736
