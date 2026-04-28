@@ -127,7 +127,7 @@ process MAKE_MANIFEST_VALIDATE {
     script:
     """
     python ${projectDir}/bin/make_manifest_validate.py \
-        --table ${input_table} \
+        --xlsx ${input_table} \
         --reads ${reads_dir} \
         --out manifest.tsv
     """
@@ -607,15 +607,9 @@ workflow {
 
     manifest_ch = MAKE_MANIFEST_VALIDATE(
         init_done,
-        input_table_file,
+        file(params.input_table),
         file(params.reads_dir)
     )
-
-    /*
-     * ============================================================
-     * SAMPLES CHANNEL
-     * ============================================================
-     */
 
     /*
      * ============================================================
