@@ -116,8 +116,8 @@ database/omsCatalog/*
 # Assets (keep demo + templates only)
 ############################################################
 assets/*
-!assets/demoCohort/
-!assets/demoCohort/**
+!assets/auxCohort/
+!assets/auxCohort/**
 !assets/templates/
 !assets/templates/**
 
