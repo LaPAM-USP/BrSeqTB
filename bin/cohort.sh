@@ -3,15 +3,12 @@
 # GATK Cohort Variant Calling and Hard Filtering (Pipeline-safe)
 #
 # Usage:
-#   ./cohort.sh <manifest.tsv> [--demo]
+#   ./cohort.sh <manifest.tsv> [--aux-cohort]
 #
 # Behavior:
-#   - DEFAULT: usa apenas biosamples do manifest.tsv
-#   - --demo  : adiciona gVCFs de assets/demo/gatk/
+#   - DEFAULT: usa only biosamples do manifest.tsv
+#   - --aux-cohort  : add gVCFs from assets/auxCohort/gatk/
 #
-# Notes:
-#   - Reprodutível (usa Conda environment ativado pelo Nextflow)
-#   - Seguro para execução via Nextflow (work/)
 # ============================================================
 
 export LC_ALL=C
@@ -26,19 +23,24 @@ PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 # ARGUMENT PARSING
 # ============================================================
 if [[ $# -lt 1 ]]; then
-    echo "Usage: ./cohort.sh <manifest.tsv> [--demo]"
+    echo "Usage: ./cohort.sh <manifest.tsv> [--aux-cohort]"
     exit 1
 fi
 
 MANIFEST="$1"
 shift
 
-USE_DEMO=false
+USE_AUX=false
 for arg in "$@"; do
     case "$arg" in
-        --demo)
-            USE_DEMO=true
-            echo "[OPT] Running WITH demo gVCFs."
+        --aux-cohort)
+            USE_AUX=true
+            echo "[OPT] Running with auxiliary cohort gVCFs."
+            ;;
+        *)
+            echo "[ERROR] Unknown option: $arg"
+            echo "Usage: ./cohort.sh <manifest.tsv> [--aux-cohort]"
+            exit 1
             ;;
     esac
 done
@@ -55,7 +57,7 @@ INDELS_FILTERED="${OUTPUT_DIR}/cohort_indels_filtered.vcf.gz"
 
 REF="${PROJECT_DIR}/database/mtbRef/NC0009623.fasta"
 GATK_DIR="${PROJECT_DIR}/gatk"
-DEMO_DIR="${PROJECT_DIR}/assets/demo/gatk"
+AUX_DIR="${PROJECT_DIR}/assets/auxCohort/gatk"
 
 THREADS="${NXF_TASK_CPUS:-1}"
 
@@ -119,12 +121,24 @@ for b in "${BIOSAMPLES[@]}"; do
 done
 
 # ============================================================
-# OPTIONAL DEMO GVCFs
+# OPTIONAL AUX GVCFs
 # ============================================================
-if [[ "$USE_DEMO" == true && -d "$DEMO_DIR" ]]; then
-    echo "[INFO] Adding DEMO gVCFs from assets/demo/"
-    mapfile -t DEMO_GVCF < <(find "$DEMO_DIR" -type f -name "*.g.vcf.gz" | sort)
-    GVCF_FILES+=("${DEMO_GVCF[@]}")
+if [[ "$USE_AUX" == true ]]; then
+
+    if [[ ! -d "$AUX_DIR" ]]; then
+        echo "[ERROR] Auxiliary cohort directory not found: $AUX_DIR"
+        exit 1
+    fi
+
+    echo "[INFO] Adding aux gVCFs from assets/auxCohort/"
+    mapfile -t AUX_GVCF < <(find "$AUX_DIR" -type f -name "*.g.vcf.gz" | sort)
+
+    if [[ ${#AUX_GVCF[@]} -eq 0 ]]; then
+        echo "[ERROR] No auxiliary gVCFs found in: $AUX_DIR"
+        exit 1
+    fi
+
+    GVCF_FILES+=("${AUX_GVCF[@]}")
 fi
 
 echo "[INFO] Total gVCFs in cohort: ${#GVCF_FILES[@]}"

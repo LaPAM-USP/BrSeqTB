@@ -370,7 +370,7 @@ brseqtb --exclude transmission,iqtree
 | Parameter    |   Description            |
 | --------     | ------------------------ |
 | --add_kaiju_manually     | If true, skips automatic Kaiju database download and expects the database to be already present locally in database/kaiju. |
-| --demo          | When activated, BrSeqTB supplements the user dataset with a predefined reference panel of ~10 high-quality TB-DR genomes during the cohort construction and variant filtering stages.     |
+| --auxCohort         | When activated, BrSeqTB supplements the user dataset with a predefined reference panel of ~10 high-quality TB-DR genomes during the cohort construction and variant filtering stages.     |
 | --modules          | Executes a single workflow module instead of the full pipeline. Accepts any valid module name (e.g., bwa, lofreq, cohort, clinical_report). Multiple values must be comma-separated.    |
 | --exclude          | Excludes optional modules during full pipeline execution. Allowed values: kaiju, transmission, iqtree, clinical_report. Multiple values must be comma-separated.    |
 | --profile standard          | Default execution profile. Runs locally using ~65% of available CPUs with dynamic parallelization and full Conda environment isolation.    |

@@ -7,10 +7,10 @@ nextflow.enable.dsl = 2
  */
 
 params.run                = null
-params.add_kaiju_manually = false
-params.input_table        = "input/input_table.csv"
-params.reads_dir          = "reads"
-params.demo = false
+params.addKaijuManually = false
+params.inputTable        = "input/input_table.csv"
+params.readsDir          = "reads"
+params.auxCohort = false
 params.module = null  // Example: bwa, trimmomatic, cohort, etc.
 params.exclude = null
 
@@ -33,7 +33,7 @@ process KAIJU_DB {
     script:
     """
     cd "${projectDir}"
-    bash bin/kaijudb.sh ${params.add_kaiju_manually}
+    bash bin/kaijudb.sh ${params.addKaijuManually}
     """
 }
 
@@ -152,7 +152,7 @@ process FASTQC {
     script:
     """
     cd "${projectDir}"
-    bash bin/fastqc.sh ${biosample} ${params.reads_dir}
+    bash bin/fastqc.sh ${biosample} ${params.readsDir}
     """
 }
 
@@ -381,7 +381,7 @@ process COHORT {
 
     input:
         val token
-        tuple path(manifest), val(use_demo)
+        tuple path(manifest), val(use_aux)
 
     output:
         val true
@@ -390,8 +390,8 @@ process COHORT {
     """
     cd "${projectDir}"
 
-    if [ "${use_demo}" = "true" ]; then
-        bash bin/cohort.sh ${manifest} --demo
+    if [ "${use_aux}" = "true" ]; then
+        bash bin/cohort.sh ${manifest} --aux-cohort
     else
         bash bin/cohort.sh ${manifest}
     fi
@@ -607,8 +607,8 @@ workflow {
 
     manifest_ch = MAKE_MANIFEST_VALIDATE(
         init_done,
-        file(params.input_table),
-        file(params.reads_dir)
+        file(params.inputTable),
+        file(params.readsDir)
     )
 
     /*
@@ -667,7 +667,7 @@ workflow {
 
             case 'cohort':
                 cohort_input_ch = manifest_ch
-                    .map { file -> tuple(file, params.demo) }
+                    .map { file -> tuple(file, params.auxCohort) }
                 COHORT(Channel.value(true), cohort_input_ch)
                 break
 
@@ -758,7 +758,7 @@ workflow {
         // BLOCO 2
 
         cohort_input_ch = manifest_ch
-            .map { file -> tuple(file, params.demo) }
+            .map { file -> tuple(file, params.auxCohort) }
 
         cohort_ch = COHORT(bloco1_sync, cohort_input_ch)
 
