@@ -121,13 +121,16 @@ for QC_DIR in "${OUTPUT_DIR}"/*_fastqc; do
     if [[ "$mean_quality" == "NA" || -z "$gc" ]]; then
         status="FAIL"
     else
-        # Check mean quality
         if (( $(echo "$mean_quality < $MIN_QUALITY" | bc -l) )); then
             status="FAIL"
-        fi
-        # Check GC range
-        if (( $(echo "$gc < $GC_MIN" | bc -l) )) || (( $(echo "$gc > $GC_MAX" | bc -l) )); then
-            status="FAIL"
+        else
+            if (( $(echo "$gc < 62" | bc -l) )) || (( $(echo "$gc > 68" | bc -l) )); then
+                status="FAIL"
+            elif (( $(echo "$gc < 63" | bc -l) )) || (( $(echo "$gc > 67" | bc -l) )); then
+                status="WARNING"
+            else
+                status="PASS"
+            fi
         fi
     fi
 
