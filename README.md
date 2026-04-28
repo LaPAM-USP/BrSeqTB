@@ -369,7 +369,7 @@ brseqtb --exclude transmission,iqtree
 
 | Parameter    |   Description            |
 | --------     | ------------------------ |
-| --inputTable | Path to the input sample sheet (input_table) used to generate the pipeline manifest. By default, BrSeqTB uses input/input_table.csv, but an equivalent .xlsx version can be provided for easier manual editing. The file must contain biosample identifiers matching the reads directory structure. |
+| --inputTable | Path to the input sample sheet used to generate the pipeline manifest. By default, BrSeqTB uses input/input_table.csv. This parameter is only required if the user chooses to provide the XLSX template (input/input_table.xlsx) instead. The table must contain biosample identifiers matching the reads directory structure. |
 | --readsDir | Directory containing input FASTQ files organized by biosample. Default: reads/. |
 | --addKaijuManually     | If true, skips automatic Kaiju database download and expects the database to be already present locally in database/kaiju. |
 | --auxCohort         | When activated, BrSeqTB supplements the user dataset with a predefined reference panel of ~10 high-quality TB-DR genomes during the cohort construction and variant filtering stages.     |
