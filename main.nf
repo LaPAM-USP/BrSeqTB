@@ -8,7 +8,7 @@ nextflow.enable.dsl = 2
 
 params.run                = null
 params.add_kaiju_manually = false
-params.input_table        = "input/input_table.xlsx"
+params.input_table        = "input/input_table.csv"
 params.reads_dir          = "reads"
 params.demo = false
 params.module = null  // Example: bwa, trimmomatic, cohort, etc.
@@ -127,7 +127,7 @@ process MAKE_MANIFEST_VALIDATE {
     script:
     """
     python ${projectDir}/bin/make_manifest_validate.py \
-        --xlsx ${input_table} \
+        --table ${input_table} \
         --reads ${reads_dir} \
         --out manifest.tsv
     """
