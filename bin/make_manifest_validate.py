@@ -123,6 +123,9 @@ def read_biosamples_from_xlsx(xlsx_path: str, sheet: Optional[str] = None) -> Li
         if not row:
             continue
 
+        if all(v is None or str(v).strip() == "" for v in row):
+            continue
+
         v = row[0]
 
         if v is None:
