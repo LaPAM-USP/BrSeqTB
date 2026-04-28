@@ -62,6 +62,24 @@ kaiju \
     -z "$THREADS" -v \
     | tee "$LOGFILE"
 
+# ===================== HTML REPORT =====================
+KRONA_TXT="${OUTPUT_DIR}/${BIOSAMPLE}_kaiju_krona.txt"
+HTML_REPORT="${OUTPUT_DIR}/${BIOSAMPLE}_kaiju_report.html"
+
+if command -v kaiju2krona >/dev/null && command -v ktImportText >/dev/null; then
+    kaiju2krona \
+        -t "${DB_DIR}/nodes.dmp" \
+        -n "${DB_DIR}/names.dmp" \
+        -i "$OUTFILE" \
+        -o "$KRONA_TXT"
+
+    ktImportText \
+        -o "$HTML_REPORT" \
+        "$KRONA_TXT"
+else
+    echo "[WARN] kaiju2krona or ktImportText not found; HTML report not generated."
+fi
+
 # ===================== SUMMARY =====================
 SUMMARY_CSV="${OUTPUT_DIR}/${BIOSAMPLE}_kaiju_summary.csv"
 
@@ -86,5 +104,7 @@ fi
 
 echo "[DONE] Kaiju finished for ${BIOSAMPLE}"
 echo "[OUT] ${OUTFILE}"
+echo "[OUT] ${HTML_REPORT}"
 echo "[OUT] ${SUMMARY_CSV}"
+
 
