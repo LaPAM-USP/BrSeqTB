@@ -51,6 +51,7 @@ dependencies:
   - trimmomatic
   - iqtree
   - kaiju
+  - krona
 
   # =========================
   # Python scientific stack
