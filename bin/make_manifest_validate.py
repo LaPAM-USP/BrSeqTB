@@ -49,7 +49,19 @@ def read_text_file_robust(table_path: str) -> Tuple[str, str]:
 
 def read_biosamples_from_table(table_path: str) -> List[str]:
     if not os.path.exists(table_path):
-        die(f"input table not found: {table_path}")
+        alt_path = None
+
+        if table_path.endswith(".tsv"):
+            alt_path = table_path[:-4] + ".csv"
+        elif table_path.endswith(".csv"):
+            alt_path = table_path[:-4] + ".tsv"
+
+        if alt_path and os.path.exists(alt_path):
+            print(f"[WARN] Input table not found: {table_path}")
+            print(f"[WARN] Using alternative input table: {alt_path}")
+            table_path = alt_path
+        else:
+            die(f"input table not found: {table_path}")
 
     if not (table_path.endswith(".tsv") or table_path.endswith(".csv")):
         die("Input table must have extension .tsv or .csv")
