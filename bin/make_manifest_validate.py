@@ -1,15 +1,10 @@
 #!/usr/bin/env python3
 # ============================================================
-# Generate manifest.tsv from input_table.tsv/input_table.csv and validate reads/
+# Generate manifest.tsv from input_table.xlsx and validate reads/
 #
 # Strict mode + full report:
 # - collects ALL biosample errors and prints them at once
 # - exits with error if any biosample has issues
-#
-# Expected input table:
-# - file extension: .tsv or .csv
-# - content MUST be TAB-separated
-# - required column: Biosample
 #
 # Expected Illumina naming convention:
 # <BIOSAMPLE>_S<NUM>_L<NNN>_R1_001.fastq.gz
@@ -20,13 +15,17 @@
 # ============================================================
 
 import argparse
-import csv
-import io
 import os
 import re
 import sys
 from collections import Counter, defaultdict
-from typing import List, Dict, Tuple
+from typing import Optional, List, Dict, Tuple
+
+try:
+    from openpyxl import load_workbook
+except ImportError:
+    print("[ERROR] Missing dependency: openpyxl. Install it in your env.", file=sys.stderr)
+    sys.exit(2)
 
 
 def die(msg: str, code: int = 1) -> None:
@@ -34,95 +33,42 @@ def die(msg: str, code: int = 1) -> None:
     sys.exit(code)
 
 
-def read_text_file_robust(table_path: str) -> Tuple[str, str]:
-    encodings = ["utf-8-sig", "utf-16", "cp1252", "latin1"]
+def read_biosamples_from_xlsx(xlsx_path: str, sheet: Optional[str] = None) -> List[str]:
+    if not os.path.exists(xlsx_path):
+        die(f"input_table.xlsx not found: {xlsx_path}")
 
-    for enc in encodings:
-        try:
-            with open(table_path, "r", encoding=enc, newline="") as f:
-                return f.read(), enc
-        except UnicodeDecodeError:
-            continue
-
-    die(f"Could not decode input table: {table_path}. Please save it as UTF-8.")
-
-
-def read_biosamples_from_table(table_path: str) -> List[str]:
-    if not os.path.exists(table_path):
-        alt_path = None
-
-        if table_path.endswith(".tsv"):
-            alt_path = table_path[:-4] + ".csv"
-        elif table_path.endswith(".csv"):
-            alt_path = table_path[:-4] + ".tsv"
-
-        if alt_path and os.path.exists(alt_path):
-            print(f"[WARN] Input table not found: {table_path}")
-            print(f"[WARN] Using alternative input table: {alt_path}")
-            table_path = alt_path
-        else:
-            die(f"input table not found: {table_path}")
-
-    if not (table_path.endswith(".tsv") or table_path.endswith(".csv")):
-        die("Input table must have extension .tsv or .csv")
-
-    content, encoding_used = read_text_file_robust(table_path)
-
-    if not content.strip():
-        die("Input table is empty.")
-
-    first_line = content.splitlines()[0]
-
-    if "\t" not in first_line:
-        if ";" in first_line:
-            die(
-                "Input table is separated by semicolon (;), but TAB is required. "
-                "Please export the file as TAB-separated."
-            )
-        if "," in first_line:
-            die(
-                "Input table is separated by comma (,), but TAB is required. "
-                "Please export the file as TAB-separated."
-            )
-
-        die(
-            "Input table is not TAB-separated. "
-            "Please export the file as TAB-separated."
-        )
-
-    handle = io.StringIO(content)
-    reader = csv.DictReader(handle, delimiter="\t")
-
-    if reader.fieldnames is None:
-        die("Input table has no header.")
-
-    reader.fieldnames = [
-        h.strip().lstrip("\ufeff").strip('"\'') if h is not None else h
-        for h in reader.fieldnames
-    ]
-
-    if "Biosample" not in reader.fieldnames:
-        die("Required column 'Biosample' not found in input table.")
+    wb = load_workbook(xlsx_path, read_only=True, data_only=True)
+    ws = wb[sheet] if sheet else wb.worksheets[0]
 
     biosamples: List[str] = []
+    for i, row in enumerate(ws.iter_rows(values_only=True), start=1):
+        if not row:
+            continue
 
-    for i, row in enumerate(reader, start=2):
-        s = (row.get("Biosample") or "").strip().strip('"\'')
+        v = row[0]
+        if v is None:
+            continue
 
+        s = str(v).strip()
         if not s:
-            die(f"Missing required Biosample value in input table at line {i}.")
+            continue
+
+        # Skip header if first cell is "Biosample" (case-insensitive)
+        if i == 1 and s.lower() == "biosample":
+            continue
 
         biosamples.append(s)
 
-    if not biosamples:
-        die("No biosamples found in the 'Biosample' column of input table.")
+    wb.close()
 
+    if not biosamples:
+        die("No biosamples found in the first column of input_table.xlsx (after header).")
+
+    # Duplicates check (strict)
     c = Counter(biosamples)
     dups = [b for b, n in c.items() if n > 1]
     if dups:
-        die(f"Duplicate biosample IDs found in input table: {', '.join(dups)}")
-
-    print(f"[OK] Input table loaded using encoding: {encoding_used}")
+        die(f"Duplicate biosample IDs found in input_table.xlsx: {', '.join(dups)}")
 
     return biosamples
 
@@ -225,9 +171,10 @@ def write_manifest(out_path: str, biosamples: List[str]) -> None:
 
 def main() -> int:
     ap = argparse.ArgumentParser(
-        description="Generate manifest.tsv from input_table.tsv/input_table.csv and validate reads/ (strict, report all errors)."
+        description="Generate manifest.tsv from input_table.xlsx and validate reads/ (strict, report all errors)."
     )
-    ap.add_argument("--table", default="input/input_table.tsv", help="Path to input_table.tsv or input_table.csv")
+    ap.add_argument("--xlsx", default="input/input_table.xlsx", help="Path to input_table.xlsx")
+    ap.add_argument("--sheet", default=None, help="Excel sheet name (default: first sheet)")
     ap.add_argument("--reads", default="reads", help="Reads directory (default: reads)")
     ap.add_argument(
         "--out",
@@ -236,7 +183,7 @@ def main() -> int:
     )
     args = ap.parse_args()
 
-    biosamples = read_biosamples_from_table(args.table)
+    biosamples = read_biosamples_from_xlsx(args.xlsx, args.sheet)
 
     pairs, errs = validate_reads_collect_errors(args.reads, biosamples)
 
@@ -262,3 +209,4 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
+
