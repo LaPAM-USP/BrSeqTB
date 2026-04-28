@@ -605,11 +605,37 @@ workflow {
      * ============================================================
      */
 
+    input_table_file = file(params.input_table)
+
+    if (!input_table_file.exists()) {
+        if (params.input_table.endsWith(".tsv")) {
+            alt_input_table = params.input_table[0..-5] + ".csv"
+        } else if (params.input_table.endsWith(".csv")) {
+            alt_input_table = params.input_table[0..-5] + ".tsv"
+        } else {
+            error "Input table must have extension .tsv or .csv: ${params.input_table}"
+        }
+
+        if (file(alt_input_table).exists()) {
+            println "[WARN] Input table not found: ${params.input_table}"
+            println "[WARN] Using alternative input table: ${alt_input_table}"
+            input_table_file = file(alt_input_table)
+        } else {
+            error "Input table not found: ${params.input_table}"
+        }
+    }
+
     manifest_ch = MAKE_MANIFEST_VALIDATE(
         init_done,
-        file(params.input_table),
+        input_table_file,
         file(params.reads_dir)
     )
+
+    /*
+     * ============================================================
+     * SAMPLES CHANNEL
+     * ============================================================
+     */
 
     /*
      * ============================================================
