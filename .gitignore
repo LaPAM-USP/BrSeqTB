@@ -30,6 +30,7 @@ reads/*
 # Real user inputs (allow only template)
 input/*
 !input/input_table.xlsx
+!input/input_table.csv
 
 # Analysis outputs
 results/
