@@ -17,6 +17,10 @@
 # Expected Illumina naming convention:
 # <BIOSAMPLE>_S<NUM>_L<NNN>_R1_001.fastq.gz
 # <BIOSAMPLE>_S<NUM>_L<NNN>_R2_001.fastq.gz
+#
+# Simplified naming convention:
+# <BIOSAMPLE>_1.fastq.gz
+# <BIOSAMPLE>_2.fastq.gz
 # ============================================================
 
 import argparse
@@ -170,7 +174,8 @@ def read_biosamples_from_table(table_path: str, sheet: Optional[str] = None) -> 
 
 def validate_reads_collect_errors(
     reads_dir: str,
-    biosamples: List[str]
+    biosamples: List[str],
+    naming: str = "illumina"
 ) -> Tuple[Dict[str, Dict[Tuple[str, str], Dict[str, str]]], List[str]]:
 
     errors: List[str] = []
@@ -188,16 +193,23 @@ def validate_reads_collect_errors(
     results: Dict[str, Dict[Tuple[str, str], Dict[str, str]]] = {}
 
     for biosample in biosamples:
-        pattern = re.compile(
-            r"^" + re.escape(biosample) + r"_S(\d+)_L(\d{3})_R([12])_001\.fastq\.gz$"
-        )
+        if naming == "illumina":
+            pattern = re.compile(
+                r"^" + re.escape(biosample) + r"_S(\d+)_L(\d{3})_R([12])_001\.fastq\.gz$"
+            )
+            example = f"{biosample}_S1_L001_R1_001.fastq.gz"
+        else:
+            pattern = re.compile(
+                r"^" + re.escape(biosample) + r"_([12])\.fastq\.gz$"
+            )
+            example = f"{biosample}_1.fastq.gz"
 
         candidates = [f for f in all_fastqs if f.startswith(biosample + "_")]
 
         if not candidates:
             errors.append(
                 f"Biosample '{biosample}': no FASTQs in '{reads_dir}'. "
-                f"Expected e.g.: {biosample}_S1_L001_R1_001.fastq.gz and R2."
+                f"Expected e.g.: {example}"
             )
             continue
 
@@ -211,8 +223,9 @@ def validate_reads_collect_errors(
 
         if invalid:
             errors.append(
-                "Biosample '{b}': invalid naming (Illumina convention required):\n{lst}".format(
+                "Biosample '{b}': invalid naming ({n} convention required):\n{lst}".format(
                     b=biosample,
+                    n=naming,
                     lst="\n".join([f"  - {x}" for x in sorted(invalid)])
                 )
             )
@@ -225,29 +238,29 @@ def validate_reads_collect_errors(
             m = pattern.match(f)
             if not m:
                 continue
-            s_num, lane, read = m.group(1), m.group(2), m.group(3)
-            key = (s_num, lane)
+            
+            if naming == "illumina":
+                s_num, lane, read = m.group(1), m.group(2), m.group(3)
+                key = (s_num, lane)
+            else:
+                read = m.group(1)
+                key = ("1", "001") # Dummy S/L for simplified
+                
             pairs[key][f"R{read}"] = os.path.join(reads_dir, f)
 
         missing: List[str] = []
         for (s_num, lane), rr in sorted(pairs.items()):
-            if "R1" not in rr:
-                missing.append(
-                    f"missing R1 for S{s_num} L{lane} (expected: {biosample}_S{s_num}_L{lane}_R1_001.fastq.gz)"
-                )
-            if "R2" not in rr:
-                missing.append(
-                    f"missing R2 for S{s_num} L{lane} (expected: {biosample}_S{s_num}_L{lane}_R2_001.fastq.gz)"
-                )
+            if naming == "illumina":
+                r1_exp = f"{biosample}_S{s_num}_L{lane}_R1_001.fastq.gz"
+                r2_exp = f"{biosample}_S{s_num}_L{lane}_R2_001.fastq.gz"
+            else:
+                r1_exp = f"{biosample}_1.fastq.gz"
+                r2_exp = f"{biosample}_2.fastq.gz"
 
-        if missing:
-            errors.append(
-                "Biosample '{b}': unpaired FASTQs:\n{lst}".format(
-                    b=biosample,
-                    lst="\n".join([f"  - {x}" for x in missing])
-                )
-            )
-            continue
+            if "R1" not in rr:
+                errors.append(f"Biosample '{biosample}': missing R1 (expected: {r1_exp})")
+            if "R2" not in rr:
+                errors.append(f"Biosample '{biosample}': missing R2 (expected: {r2_exp})")
 
         results[biosample] = dict(pairs)
 
@@ -271,6 +284,7 @@ def main() -> int:
     ap.add_argument("--table", default="input/input_table.csv", help="Path to input_table.csv or input_table.xlsx")
     ap.add_argument("--sheet", default=None, help="Excel sheet name, only used for .xlsx input")
     ap.add_argument("--reads", default="reads", help="Reads directory (default: reads)")
+    ap.add_argument("--naming", default="illumina", choices=["illumina", "simplified"], help="Naming convention (default: illumina)")
     ap.add_argument(
         "--out",
         default="manifest.tsv",
@@ -280,7 +294,7 @@ def main() -> int:
 
     biosamples = read_biosamples_from_table(args.table, args.sheet)
 
-    pairs, errs = validate_reads_collect_errors(args.reads, biosamples)
+    pairs, errs = validate_reads_collect_errors(args.reads, biosamples, args.naming)
 
     if errs:
         print("[ERROR] Validation failed. Fix the following issues and re-run:\n", file=sys.stderr)

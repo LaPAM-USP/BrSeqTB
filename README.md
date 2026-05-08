@@ -266,14 +266,10 @@ All sequencing reads must be placed inside the `reads/` directory:
 reads/
 ```
 
+BrSeqTB supports two naming conventions for FASTQ files, which can be selected using the `--readsNaming` parameter:
+
+### 1. Illumina Convention (Default)
 Files must follow the **strict Illumina paired-end naming convention**:
-
-```
-biosample_S1_L001_R1_001.fastq.gz
-biosample_S1_L001_R2_001.fastq.gz
-```
-
-Naming structure:
 
 ```
 <BIOSAMPLE>_S<NUM>_L<NNN>_R1_001.fastq.gz
@@ -281,27 +277,50 @@ Naming structure:
 ```
 
 Explanation:
-
-* `<BIOSAMPLE>` → Must exactly match the biosample ID in `input_table.xlsx`
+* `<BIOSAMPLE>` → Must exactly match the biosample ID in the input table
 * `S<NUM>` → Sample number
 * `L<NNN>` → Lane number
 * `R1/R2` → Read direction (forward/reverse)
 * `_001` → File index
 * `.fastq.gz` → Gzipped FASTQ format
 
-⚠ The pipeline performs strict validation. Any mismatch between FASTQ filenames and biosample IDs in the input table will result in execution failure.
+### 2. Simplified Convention
+Alternatively, you can use a simplified naming convention by passing `--readsNaming simplified`:
+
+```
+<BIOSAMPLE>_1.fastq.gz
+<BIOSAMPLE>_2.fastq.gz
+```
+
+Explanation:
+* `<BIOSAMPLE>` → Must exactly match the biosample ID in the input table
+* `_1/_2` → Read direction (forward/reverse)
+* `.fastq.gz` → Gzipped FASTQ format
+
+⚠ The pipeline performs strict validation based on the selected naming convention. Any mismatch between FASTQ filenames and biosample IDs in the input table will result in execution failure.
 
 ---
 
-Correct structure example:
+Correct structure examples:
 
+**Illumina (Default):**
 ```
 brseqtb/
 ├── input/
-│   └── input_table.xlsx
+│   └── input_table.csv
 ├── reads/
 │   ├── 1827-22_S1_L001_R1_001.fastq.gz
 │   └── 1827-22_S1_L001_R2_001.fastq.gz
+```
+
+**Simplified (`--readsNaming simplified`):**
+```
+brseqtb/
+├── input/
+│   └── input_table.csv
+├── reads/
+│   ├── ERR1034802_1.fastq.gz
+│   └── ERR1034802_2.fastq.gz
 ```
 
 
@@ -313,6 +332,12 @@ Runs the complete workflow from pre-processing to final clinical reports, includ
 ```bash
 brseqtb
 ```
+
+### Run with Simplified Naming
+```bash
+brseqtb --readsNaming simplified
+```
+
 ### Run a Specific Module
 Executes only a single module.
 
@@ -371,6 +396,7 @@ brseqtb --exclude transmission,iqtree
 | --------     | ------------------------ |
 | --inputTable | Path to the input sample sheet used to generate the pipeline manifest. By default, BrSeqTB uses input/input_table.csv. This parameter is only required if the user chooses to provide the XLSX template (input/input_table.xlsx) instead. The table must contain biosample identifiers matching the reads directory structure. |
 | --readsDir | Directory containing input FASTQ files organized by biosample. Default: reads/. |
+| --readsNaming | FASTQ naming convention. Options: `illumina` (default) or `simplified` (<BIOSAMPLE>_1.fastq.gz). |
 | --addKaijuManually     | If true, skips automatic Kaiju database download and expects the database to be already present locally in database/kaiju. |
 | --auxCohort         | When activated, BrSeqTB supplements the user dataset with a predefined reference panel of ~10 high-quality TB-DR genomes during the cohort construction and variant filtering stages.     |
 | --module          | Executes a single workflow module instead of the full pipeline. Accepts any valid module name (e.g., bwa, lofreq, cohort, clinical_report). Multiple values must be comma-separated.    |

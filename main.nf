@@ -10,6 +10,7 @@ params.run                = null
 params.addKaijuManually = false
 params.inputTable        = "input/input_table.csv"
 params.readsDir          = "reads"
+params.readsNaming       = "illumina"
 params.auxCohort = false
 params.module = null  // Example: bwa, trimmomatic, cohort, etc.
 params.exclude = null
@@ -118,6 +119,7 @@ process MAKE_MANIFEST_VALIDATE {
         val token
         path input_table
         path reads_dir
+        val naming
 
     output:
         path "manifest.tsv"
@@ -129,6 +131,7 @@ process MAKE_MANIFEST_VALIDATE {
     python ${projectDir}/bin/make_manifest_validate.py \
         --table ${input_table} \
         --reads ${reads_dir} \
+        --naming ${naming} \
         --out manifest.tsv
     """
 }
@@ -608,7 +611,8 @@ workflow {
     manifest_ch = MAKE_MANIFEST_VALIDATE(
         init_done,
         file(params.inputTable),
-        file(params.readsDir)
+        file(params.readsDir),
+        params.readsNaming
     )
 
     /*
