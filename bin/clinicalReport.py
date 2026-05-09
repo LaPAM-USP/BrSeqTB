@@ -247,14 +247,62 @@ def process_resistance(biosample):
 
     return trad_r, trad_s, var_str, comentarios, hetero, borderline, fail_filters, trad
 
+def read_input_table(biosample):
+    """
+    Reads the input table (CSV or XLSX) and returns the row for the given biosample.
+    """
+    ext = os.path.splitext(INPUT_TABLE)[1].lower()
+    
+    # Try both .xlsx and .csv if one fails or doesn't exist
+    possible_paths = [INPUT_TABLE]
+    if ext == ".xlsx":
+        possible_paths.append(INPUT_TABLE.replace(".xlsx", ".csv"))
+    elif ext == ".csv":
+        possible_paths.append(INPUT_TABLE.replace(".csv", ".xlsx"))
+
+    df = None
+    for path in possible_paths:
+        if not os.path.exists(path):
+            continue
+            
+        try:
+            if path.endswith(".csv"):
+                # Try different encodings for CSV
+                for enc in ["utf-8-sig", "utf-16", "cp1252", "latin1"]:
+                    try:
+                        df = pd.read_csv(path, dtype=str, encoding=enc).fillna("")
+                        break
+                    except UnicodeDecodeError:
+                        continue
+            else:
+                df = pd.read_excel(path, dtype=str).fillna("")
+            
+            if df is not None:
+                # Standardize column name to 'Biosample'
+                if "Biosample" not in df.columns:
+                    # Look for case-insensitive match
+                    for col in df.columns:
+                        if col.lower() == "biosample":
+                            df.rename(columns={col: "Biosample"}, inplace=True)
+                            break
+                
+                if "Biosample" in df.columns:
+                    row = df[df["Biosample"] == biosample]
+                    if not row.empty:
+                        return row.iloc[0]
+        except Exception as e:
+            print(f"[WARN] Failed to read {path}: {e}")
+            continue
+
+    raise ValueError(f"Biosample '{biosample}' not found in input table (tried CSV/XLSX)")
+
 # ============================================================
 # GENERATE WORD REPORT
 # ============================================================
 
 def gerar_laudo_word(biosample):
 
-    df = pd.read_excel(INPUT_TABLE, dtype=str).fillna("")
-    row = df[df["Biosample"] == biosample].iloc[0]
+    row = read_input_table(biosample)
 
     FARMACOS_R, FARMACOS_S, VAR_RESISTENCIA, COMENTARIOS, hetero, bl, flt, trad = process_resistance(biosample)
 
