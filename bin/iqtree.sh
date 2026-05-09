@@ -52,10 +52,21 @@ echo "[OUT] Output directory: $OUTPUT_DIR"
 echo "[SET] Model=$MODEL | Bootstraps=$BOOTSTRAP | Threads=$THREADS"
 echo "---------------------------------------------"
 
+# Check number of sequences to decide if bootstrap is possible (requires >= 4)
+NUM_SEQ=$(grep -c "^>" "$INPUT_FASTA")
+echo "[INFO] Number of sequences in alignment: $NUM_SEQ"
+
+if [[ $NUM_SEQ -lt 4 ]]; then
+    echo "[WARN] Fewer than 4 sequences detected. Disabling bootstrapping ($BOOTSTRAP)."
+    BOOTSTRAP_CMD=""
+else
+    BOOTSTRAP_CMD="-B $BOOTSTRAP"
+fi
+
 iqtree \
     -s "$INPUT_FASTA" \
     -m "$MODEL" \
-    -B "$BOOTSTRAP" \
+    $BOOTSTRAP_CMD \
     -T "$THREADS" \
     -pre "${OUTPUT_DIR}/snpmatrix" \
     -redo \
