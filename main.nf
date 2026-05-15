@@ -10,6 +10,7 @@ params.run                = null
 params.addKaijuManually = false
 params.inputTable        = "input/input_table.csv"
 params.readsDir          = "reads"
+params.readsNaming       = "illumina"
 params.auxCohort = false
 params.module = null  // Example: bwa, trimmomatic, cohort, etc.
 params.exclude = null
@@ -118,6 +119,7 @@ process MAKE_MANIFEST_VALIDATE {
         val token
         path input_table
         path reads_dir
+        val naming
 
     output:
         path "manifest.tsv"
@@ -129,6 +131,7 @@ process MAKE_MANIFEST_VALIDATE {
     python ${projectDir}/bin/make_manifest_validate.py \
         --table ${input_table} \
         --reads ${reads_dir} \
+        --naming ${naming} \
         --out manifest.tsv
     """
 }
@@ -242,7 +245,7 @@ process LOFREQ {
     script:
     """
     cd "${projectDir}"
-    bash bin/lofreq.sh ${biosample}
+    bash bin/lofreq.sh ${biosample} ${task.cpus}
     """
 }
 
@@ -573,6 +576,7 @@ process CLINICAL_REPORT {
 
     input:
         val biosample
+        path input_table
 
     output:
         val biosample
@@ -580,7 +584,7 @@ process CLINICAL_REPORT {
     script:
     """
     cd "${projectDir}"
-    python bin/clinicalReport.py ${biosample}
+    python bin/clinicalReport.py ${biosample} --table ${input_table}
     """
 }
 
@@ -608,7 +612,8 @@ workflow {
     manifest_ch = MAKE_MANIFEST_VALIDATE(
         init_done,
         file(params.inputTable),
-        file(params.readsDir)
+        file(params.readsDir),
+        params.readsNaming
     )
 
     /*
