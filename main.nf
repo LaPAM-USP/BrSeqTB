@@ -685,7 +685,7 @@ workflow {
             case 'resistance_report': RESISTANCE_REPORT(samples_ch); break
             case 'resistance_summary': RESISTANCE_SUMMARY(Channel.value(true)); break
             case 'qc_summary': QC_SUMMARY(Channel.value(true)); break
-            case 'clinical_report': CLINICAL_REPORT(samples_ch); break
+            case 'clinical_report': CLINICAL_REPORT(samples_ch, file(params.inputTable)); break
 
             default:
                 error "Módulo inválido: ${params.module}"
@@ -831,7 +831,7 @@ workflow {
             .map { biosample, _ -> biosample }
 
         if (!excluded.contains('clinical_report')) {
-            clinical_report_ch = CLINICAL_REPORT(clinical_samples_ch)
+            clinical_report_ch = CLINICAL_REPORT(clinical_samples_ch,file(params.inputTable))
         }
     }
 }
