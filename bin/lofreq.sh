@@ -102,7 +102,8 @@ lofreq indelqual \
     -o "$INDELQUAL_BAM" \
     "$BAM_FILE"
 
-samtools index -f "$INDELQUAL_BAM"
+rm -f "${INDELQUAL_BAM}.bai" "${INDELQUAL_BAM%.bam}.bai"
+samtools index -@ "$THREADS" "$INDELQUAL_BAM"
 
 echo "[OK] Indel qualities added."
 
