@@ -1,14 +1,16 @@
 #!/usr/bin/env bash
 # ============================================================
-# Variant calling with LoFreq (single-thread, no indelqual)
-# Usage: ./lofreq.sh <biosample>
+# Variant calling with LoFreq (parallel, with indelqual)
+# Usage: ./lofreq.sh <biosample> [threads]
 # Input:  bwa/<biosample>/<biosample>.bam
 # Output: lofreq/<biosample>/<biosample>_lofreq.vcf.gz
 # Reference: database/mtbRef/NC0009623.fasta
 #
 # Notes:
-# - LoFreq is inherently single-threaded
-# - Parallelization is handled by Nextflow per biosample
+# - LoFreq call-parallel is used for within-sample parallelization
+# - Indel qualities are added before variant calling for INDEL support
+# - Default LoFreq filters are kept enabled
+# - Final variants are filtered by AF >= 0.05
 # ============================================================
 
 export LC_ALL=C
@@ -17,6 +19,7 @@ set -euo pipefail
 START_TIME=$SECONDS
 
 BIOSAMPLE="${1:-}"
+THREADS="${2:-1}"
 
 PROJECT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 
@@ -26,7 +29,7 @@ OUTPUT_DIR="${PROJECT_DIR}/lofreq/${BIOSAMPLE}"
 
 # ================== CHECK INPUT ==================
 if [[ -z "$BIOSAMPLE" ]]; then
-    echo "Usage: ./lofreq.sh <biosample>"
+    echo "Usage: ./lofreq.sh <biosample> [threads]"
     exit 1
 fi
 
@@ -43,7 +46,7 @@ fi
 mkdir -p "$OUTPUT_DIR"
 
 # ================== DEPENDENCY CHECKS ==================
-for cmd in lofreq bgzip bcftools; do
+for cmd in lofreq samtools bgzip bcftools; do
     if ! command -v "$cmd" >/dev/null 2>&1; then
         echo "[ERROR] Required command not found: $cmd"
         exit 1
@@ -53,6 +56,7 @@ done
 echo "[RUN] Running LoFreq for biosample: ${BIOSAMPLE}"
 echo "[REF] Reference genome: ${REF}"
 echo "[OUT] Output directory: ${OUTPUT_DIR}"
+echo "[THREADS] ${THREADS}"
 echo "---------------------------------------------"
 
 # ================== FIND BAM FILE ==================
@@ -63,7 +67,15 @@ if [[ ! -f "$BAM_FILE" ]]; then
     exit 1
 fi
 
+if [[ ! -f "${BAM_FILE}.bai" ]] && [[ ! -f "${BAM_FILE%.bam}.bai" ]]; then
+    echo "[ERROR] BAM index not found for: ${BAM_FILE}"
+    echo "        Expected: ${BAM_FILE}.bai or ${BAM_FILE%.bam}.bai"
+    exit 1
+fi
+
 # ================== DEFINE OUTPUT ==================
+INDELQUAL_BAM="${OUTPUT_DIR}/${BIOSAMPLE}.indelqual.bam"
+RAW_VCF_OUTPUT="${OUTPUT_DIR}/${BIOSAMPLE}_lofreq.raw.vcf"
 VCF_OUTPUT="${OUTPUT_DIR}/${BIOSAMPLE}_lofreq.vcf"
 VCF_GZ="${VCF_OUTPUT}.gz"
 
@@ -75,17 +87,48 @@ if [[ -f "$VCF_GZ" ]] && [[ -f "${VCF_GZ}.csi" ]]; then
     exit 0
 fi
 
-# ================== RUN LoFreq ==================
-echo "[RUN] Calling variants (single-thread)..."
+# ================== PREPARE REFERENCE INDEX ==================
+if [[ ! -f "${REF}.fai" ]]; then
+    echo "[RUN] FASTA index not found. Creating: ${REF}.fai"
+    samtools faidx "$REF"
+fi
 
-lofreq call \
-    --call-indels \
-    --no-default-filter \
+# ================== ADD INDEL QUALITIES ==================
+echo "[RUN] Adding indel qualities with LoFreq indelqual..."
+
+lofreq indelqual \
+    --dindel \
     -f "$REF" \
-    -o "$VCF_OUTPUT" \
+    -o "$INDELQUAL_BAM" \
     "$BAM_FILE"
 
-echo "[OK] Variant calling complete."
+samtools index -f "$INDELQUAL_BAM"
+
+echo "[OK] Indel qualities added."
+
+# ================== RUN LoFreq ==================
+echo "[RUN] Calling variants with LoFreq call-parallel..."
+
+lofreq call-parallel \
+    --pp-threads "$THREADS" \
+    --call-indels \
+    -m 60 \
+    -Q 30 \
+    -f "$REF" \
+    -o "$RAW_VCF_OUTPUT" \
+    "$INDELQUAL_BAM"
+
+echo "[OK] Raw variant calling complete."
+
+# ================== FILTER BY ALLELE FREQUENCY ==================
+echo "[RUN] Filtering variants by allele frequency >= 0.05..."
+
+lofreq filter \
+    -a 0.05 \
+    -i "$RAW_VCF_OUTPUT" \
+    -o "$VCF_OUTPUT"
+
+echo "[OK] Allele frequency filtering complete."
 
 # ================== COMPRESS & INDEX ==================
 bgzip -f "$VCF_OUTPUT"
@@ -99,4 +142,3 @@ printf "[DONE] LoFreq completed for %s (%02d min %02d sec)\n" \
     "$BIOSAMPLE" $((ELAPSED/60)) $((ELAPSED%60))
 
 echo "[OUT] ${VCF_GZ}"
-
