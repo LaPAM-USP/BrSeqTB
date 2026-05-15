@@ -66,23 +66,70 @@ echo "[INFO] Using picard: $(which picard)"
 echo "---------------------------------------------"
 
 # ===================== LOCATE READS =====================
-R1_FILE=$(find "$TRIM_DIR" -type f -name "*_R1_001.fastq.gz" | head -n 1)
-R2_FILE="${R1_FILE/_R1_/_R2_}"
+mapfile -t R1_FILES < <(find "$TRIM_DIR" -type f -name "*_R1_001.fastq.gz" | sort)
 
-if [[ -z "$R1_FILE" || ! -f "$R2_FILE" ]]; then
-    echo "[ERROR] Could not find paired R1/R2 FASTQs."
+if [[ "${#R1_FILES[@]}" -eq 0 ]]; then
+    echo "[ERROR] Could not find any R1 FASTQs in: $TRIM_DIR"
     exit 1
 fi
 
 mkdir -p "$TMP_DIR"
 
+echo "[INFO] Found ${#R1_FILES[@]} R1 FASTQ file(s) for ${BIOSAMPLE}"
 echo "[RUN] Mapping ${BIOSAMPLE} with ${THREADS} threads..."
 
-# ===================== MAPPING and ADD READ GROUPS (up-to-date)=====================
-bwa mem -t "$THREADS" \
-  -R "@RG\tID:${BIOSAMPLE}\tSM:${BIOSAMPLE}\tPL:ILLUMINA\tLB:${BIOSAMPLE}\tPU:unit1" \
-  "$REF" "$R1_FILE" "$R2_FILE" \
-| samtools view -b - > "$RAW_BAM"
+RG_BAMS=()
+
+# ===================== MAPPING and ADD READ GROUPS =====================
+for R1_FILE in "${R1_FILES[@]}"; do
+    R2_FILE="${R1_FILE/_R1_/_R2_}"
+
+    if [[ ! -f "$R2_FILE" ]]; then
+        echo "[ERROR] Could not find matching R2 for: $R1_FILE"
+        exit 1
+    fi
+
+    R1_BASENAME="$(basename "$R1_FILE")"
+
+    if [[ "$R1_BASENAME" =~ ^(.+)_S([0-9]+)_L([0-9]{3})_R1_001\.fastq\.gz$ ]]; then
+        SAMPLE_NUMBER="${BASH_REMATCH[2]}"
+        LANE="${BASH_REMATCH[3]}"
+    else
+        echo "[ERROR] Could not extract sample number and lane from filename: $R1_BASENAME"
+        exit 1
+    fi
+
+    READ_GROUP_ID="${BIOSAMPLE}_S${SAMPLE_NUMBER}_L${LANE}"
+    READ_GROUP_PU="S${SAMPLE_NUMBER}_L${LANE}"
+
+    RG_BAM="${TMP_DIR}/${READ_GROUP_ID}.raw.bam"
+    RG_BAMS+=("$RG_BAM")
+
+    echo "[RUN] Mapping ${R1_BASENAME}"
+    echo "[INFO] Read group ID: ${READ_GROUP_ID}"
+    echo "[INFO] Sample name: ${BIOSAMPLE}"
+    echo "[INFO] Platform unit: ${READ_GROUP_PU}"
+
+    bwa mem -t "$THREADS" \
+      -R "@RG\tID:${READ_GROUP_ID}\tSM:${BIOSAMPLE}\tPL:ILLUMINA\tLB:${BIOSAMPLE}\tPU:${READ_GROUP_PU}" \
+      "$REF" "$R1_FILE" "$R2_FILE" \
+    | samtools view -b - > "$RG_BAM"
+done
+
+# ===================== MERGE RAW BAMS FROM ALL READ PAIRS / LANES =====================
+if [[ "${#RG_BAMS[@]}" -eq 1 ]]; then
+    mv "${RG_BAMS[0]}" "$RAW_BAM"
+else
+    echo "[RUN] Merging ${#RG_BAMS[@]} BAM files into one raw BAM for ${BIOSAMPLE}"
+
+    samtools merge \
+        -@ "$THREADS" \
+        -f \
+        "$RAW_BAM" \
+        "${RG_BAMS[@]}"
+
+    rm -f "${RG_BAMS[@]}"
+fi
 
 # ===================== SORT =====================
 samtools sort -@ "$THREADS" "$RAW_BAM" -o "$SORTED_BAM"
