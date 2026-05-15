@@ -38,8 +38,15 @@ fi
 
 mkdir -p "$OUTPUT_DIR"
 
+TMP_DIR="${OUTPUT_DIR}/tmp"
+RAW_BAM="${TMP_DIR}/${BIOSAMPLE}.raw.bam"
+SORTED_BAM="${TMP_DIR}/${BIOSAMPLE}.sorted.bam"
+FINAL_BAM="${OUTPUT_DIR}/${BIOSAMPLE}.bam"
+METRICS_FILE="${TMP_DIR}/${BIOSAMPLE}_dupMetrics.txt"
+FLAGSTAT_FILE="${TMP_DIR}/${BIOSAMPLE}_flagstat.txt"
+
 # ===================== SKIP IF ALREADY DONE =====================
-if [[ -s "$SUMMARY_CSV" ]]; then
+if [[ -s "$SUMMARY_CSV" && -f "$FINAL_BAM" ]]; then
     echo "[SKIP] BWA already completed for ${BIOSAMPLE}"
     echo "[OUT] ${SUMMARY_CSV}"
     exit 0
@@ -58,9 +65,6 @@ echo "[INFO] Using samtools: $(which samtools)"
 echo "[INFO] Using picard: $(which picard)"
 echo "---------------------------------------------"
 
-# ===================== HEADER OF CSV =====================
-echo "biosample,filename,total_reads,mapped_reads,mapped_pct,duplicates_pct,properly_paired_pct,coverage_pct,status" > "$SUMMARY_CSV"
-
 # ===================== LOCATE READS =====================
 R1_FILE=$(find "$TRIM_DIR" -type f -name "*_R1_001.fastq.gz" | head -n 1)
 R2_FILE="${R1_FILE/_R1_/_R2_}"
@@ -70,14 +74,7 @@ if [[ -z "$R1_FILE" || ! -f "$R2_FILE" ]]; then
     exit 1
 fi
 
-TMP_DIR="${OUTPUT_DIR}/tmp"
 mkdir -p "$TMP_DIR"
-
-RAW_BAM="${TMP_DIR}/${BIOSAMPLE}.raw.bam"
-SORTED_BAM="${TMP_DIR}/${BIOSAMPLE}.sorted.bam"
-FINAL_BAM="${OUTPUT_DIR}/${BIOSAMPLE}.bam"
-METRICS_FILE="${TMP_DIR}/${BIOSAMPLE}_dupMetrics.txt"
-FLAGSTAT_FILE="${TMP_DIR}/${BIOSAMPLE}_flagstat.txt"
 
 echo "[RUN] Mapping ${BIOSAMPLE} with ${THREADS} threads..."
 
@@ -105,21 +102,16 @@ samtools index "$FINAL_BAM"
 # ===================== FLAGSTAT =====================
 samtools flagstat "$FINAL_BAM" > "$FLAGSTAT_FILE"
 
+# ===================== HEADER OF CSV =====================
+echo "biosample,filename,total_reads,mapped_reads,mapped_pct,duplicates_pct,properly_paired_pct,coverage_pct,status" > "$SUMMARY_CSV"
+
 # ===================== METRICS =====================
 total_reads=$(awk '/in total/ {print $1; exit}' "$FLAGSTAT_FILE")
 
 mapped_reads=$(awk '/primary mapped/ {print $1; exit}' "$FLAGSTAT_FILE")
-mapped_pct=$(awk '/primary mapped/ {
-    match($0, /\(([0-9.]+)%/, a);
-    print a[1] "%"
-    exit
-}' "$FLAGSTAT_FILE")
+mapped_pct=$(awk -F'[()]' '/primary mapped/ {print $2}' "$FLAGSTAT_FILE" | awk '{print $1}')
 
-paired_pct=$(awk '/properly paired/ {
-    match($0, /\(([0-9.]+)%/, a);
-    print a[1] "%"
-    exit
-}' "$FLAGSTAT_FILE")
+paired_pct=$(awk -F'[()]' '/properly paired/ {print $2}' "$FLAGSTAT_FILE" | awk '{print $1}')
 
 dup_pct=$(awk '/primary duplicates/ {
     print $1
