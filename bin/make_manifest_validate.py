@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# ============================================================
+# ==============================================================
 # Generate manifest.tsv from input_table.csv or input_table.xlsx
 # and validate reads/
 #
@@ -17,7 +17,7 @@
 # Expected Illumina naming convention:
 # <BIOSAMPLE>_S<NUM>_L<NNN>_R1_001.fastq.gz
 # <BIOSAMPLE>_S<NUM>_L<NNN>_R2_001.fastq.gz
-# ============================================================
+# ==============================================================
 
 import argparse
 import csv
