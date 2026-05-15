@@ -41,7 +41,7 @@ SAMPLE
             ├─ GATK_GVCF ── TBDR_RCOV
             ├─ GATK_VCF ── NORM ── LINEAGE
             ├─ LOFREQ + GATK_GVCF ── NTM_FILTER
-            └─ LOFREQ + GATK_GVCF + GATK_VCF + NORM ── SNPEFF
+            └─ LOFREQ + DELLY + GATK_VCF + NORM ── SNPEFF
 
 BLOCK 2 — COHORT LEVEL
 
