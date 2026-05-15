@@ -5,9 +5,11 @@
 #
 # Usage:
 #   python3 clinicalReport.py <biosample ID>
+#   python3 clinicalReport.py <biosample ID> --table input/input_table.xlsx
 #
 # Inputs:
-#   - input/input_table.xlsx
+#   - input/input_table.csv  (default)
+#   - input/input_table.xlsx (optional with --table)
 #   - results/qc_summary.xlsx
 #   - results/resistance/<biosample>.xlsx
 #   - database/omsCatalog/dictionary.xlsx
@@ -25,6 +27,7 @@
 
 import sys
 import os
+import argparse
 import pandas as pd
 from datetime import datetime
 from docx import Document
@@ -40,7 +43,7 @@ PROJECT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 # CONFIGURATION
 # ============================================================
 
-INPUT_TABLE   = os.path.join(PROJECT_DIR, "input", "input_table.xlsx")
+INPUT_TABLE   = os.path.join(PROJECT_DIR, "input", "input_table.csv")
 QC_SUMMARY    = os.path.join(PROJECT_DIR, "results", "qc_summary.xlsx")
 RESISTANCE_DIR = os.path.join(PROJECT_DIR, "results", "resistance")
 DICTIONARY    = os.path.join(PROJECT_DIR, "database", "omsCatalog", "dictionary.xlsx")
@@ -135,6 +138,27 @@ def get_lineage(biosample):
     except:
         pass
     return ""
+
+def read_input_table(table_path):
+    ext = os.path.splitext(table_path)[1].lower()
+
+    if ext == ".csv":
+        encodings = ["utf-8-sig", "utf-16", "cp1252", "latin1"]
+
+        last_error = None
+        for enc in encodings:
+            try:
+                return pd.read_csv(table_path, dtype=str, encoding=enc).fillna("")
+            except UnicodeDecodeError as e:
+                last_error = e
+                continue
+
+        raise RuntimeError(f"Could not decode input table as CSV: {table_path}. Last error: {last_error}")
+
+    if ext == ".xlsx":
+        return pd.read_excel(table_path, dtype=str).fillna("")
+
+    raise ValueError("Input table must have extension .csv or .xlsx")
 
 # ============================================================
 # TRANSLATE DRUG NAMES IN COVERAGE FAILURES
@@ -251,9 +275,9 @@ def process_resistance(biosample):
 # GENERATE WORD REPORT
 # ============================================================
 
-def gerar_laudo_word(biosample):
+def gerar_laudo_word(biosample, input_table):
 
-    df = pd.read_excel(INPUT_TABLE, dtype=str).fillna("")
+    df = read_input_table(input_table)
     row = df[df["Biosample"] == biosample].iloc[0]
 
     FARMACOS_R, FARMACOS_S, VAR_RESISTENCIA, COMENTARIOS, hetero, bl, flt, trad = process_resistance(biosample)
@@ -348,13 +372,19 @@ def gerar_laudo_word(biosample):
 # ============================================================
 
 def main():
-    if len(sys.argv) != 2:
-        print("Usage: python3 clinicalReport.py <biosample ID>")
-        sys.exit(1)
+    parser = argparse.ArgumentParser(
+        description="Generate clinical TB resistance Word report."
+    )
+    parser.add_argument("biosample", help="Biosample ID")
+    parser.add_argument(
+        "--table",
+        default=INPUT_TABLE,
+        help="Path to input_table.csv or input_table.xlsx"
+    )
 
-    biosample = sys.argv[1]
-    gerar_laudo_word(biosample)
+    args = parser.parse_args()
+
+    gerar_laudo_word(args.biosample, args.table)
 
 if __name__ == "__main__":
     main()
-
