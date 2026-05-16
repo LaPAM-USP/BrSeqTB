@@ -353,6 +353,14 @@ brseqtb --module fastqc
 brseqtb --module trimmomatic
 ```
 
+### Set the Minimum Allele Frequency for LoFreq
+By default, LoFreq variants are filtered using a minimum allele frequency of `0.05`:
+
+```bash
+brseqtb --module lofreq
+brseqtb --module lofreq --lofreqMinAf 0.10
+```
+
 > ⚠ **Important — Module Dependencies:**
 > Although modules can be executed individually, they **respect the logical dependencies defined in the workflow DAG**.
 >
@@ -400,8 +408,9 @@ brseqtb --exclude transmission,iqtree
 | --readsDir | Directory containing input FASTQ files organized by biosample. Default: reads/. |
 | --readsNaming | FASTQ naming convention. Options: `illumina` (default) or `simplified` (<BIOSAMPLE>_1.fastq.gz). |
 | --addKaijuManually     | If true, skips automatic Kaiju database download and expects the database to be already present locally in database/kaiju. |
+| --lofreqMinAf | Minimum allele frequency used to filter LoFreq variants. Default: 0.05. For example, `--lofreqMinAf 0.10` keeps only LoFreq variants with AF >= 0.10. This parameter applies both to full pipeline execution and to isolated LoFreq module execution. |
 | --auxCohort         | When activated, BrSeqTB supplements the user dataset with a predefined reference panel of ~10 high-quality TB-DR genomes during the cohort construction and variant filtering stages.     |
-| --module          | Executes a single workflow module instead of the full pipeline. Accepts any valid module name (e.g., bwa, lofreq, cohort, clinical_report). Multiple values must be comma-separated.    |
+| --module | Executes a single workflow module instead of the full pipeline. Accepts one valid module name at a time, such as `bwa`, `lofreq`, `cohort`, or `clinical_report`. |
 | --exclude          | Excludes optional modules during full pipeline execution. Allowed values: kaiju, transmission, iqtree, clinical_report. Multiple values must be comma-separated.    |
 | --profile standard          | Default execution profile. Runs locally using ~65% of available CPUs with dynamic parallelization and full Conda environment isolation.    |
 | -profile lowmem          | Safe execution mode for low-resource machines (e.g., 8GB RAM laptops). Reduces CPU usage and memory allocation to prevent crashes.    |

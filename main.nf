@@ -14,6 +14,7 @@ params.readsNaming       = "illumina"
 params.auxCohort = false
 params.module = null  // Example: bwa, trimmomatic, cohort, etc.
 params.exclude = null
+params.lofreqMinAf      = 0.05
 
 /*
  * ============================================================
@@ -245,7 +246,7 @@ process LOFREQ {
     script:
     """
     cd "${projectDir}"
-    bash bin/lofreq.sh ${biosample} ${task.cpus}
+    bash bin/lofreq.sh ${biosample} ${task.cpus} ${params.lofreqMinAf}
     """
 }
 
