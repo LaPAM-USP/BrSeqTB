@@ -354,10 +354,10 @@ brseqtb --module trimmomatic
 ```
 
 ### Set the Minimum Allele Frequency for LoFreq
-By default, LoFreq variants are filtered using a minimum allele frequency of `0.05`:
+By default, LoFreq variants are filtered using a minimum allele frequency of `0.05`.
 
 ```bash
-brseqtb --module lofreq
+brseqtb --lofreqMinAf 0.10
 brseqtb --module lofreq --lofreqMinAf 0.10
 ```
 
