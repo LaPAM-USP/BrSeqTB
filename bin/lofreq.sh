@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # ============================================================
 # Variant calling with LoFreq (parallel, with indelqual)
-# Usage: ./lofreq.sh <biosample> [threads]
+# Usage: ./lofreq.sh <biosample> [threads] [min_af]
 # Input:  bwa/<biosample>/<biosample>.bam
 # Output: lofreq/<biosample>/<biosample>_lofreq.vcf.gz
 # Reference: database/mtbRef/NC0009623.fasta
@@ -9,8 +9,8 @@
 # Notes:
 # - LoFreq call-parallel is used for within-sample parallelization
 # - Indel qualities are added before variant calling for INDEL support
-# - Default LoFreq filters are kept enabled
-# - Final variants are filtered by AF >= 0.05
+# - Final variants are filtered by AF >= min_af
+# - Default min_af is 0.05
 # ============================================================
 
 export LC_ALL=C
@@ -20,6 +20,7 @@ START_TIME=$SECONDS
 
 BIOSAMPLE="${1:-}"
 THREADS="${2:-1}"
+MIN_AF="${3:-0.05}"
 
 PROJECT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 
@@ -29,7 +30,7 @@ OUTPUT_DIR="${PROJECT_DIR}/lofreq/${BIOSAMPLE}"
 
 # ================== CHECK INPUT ==================
 if [[ -z "$BIOSAMPLE" ]]; then
-    echo "Usage: ./lofreq.sh <biosample> [threads]"
+    echo "Usage: ./lofreq.sh <biosample> [threads] [min_af]"
     exit 1
 fi
 
@@ -57,6 +58,7 @@ echo "[RUN] Running LoFreq for biosample: ${BIOSAMPLE}"
 echo "[REF] Reference genome: ${REF}"
 echo "[OUT] Output directory: ${OUTPUT_DIR}"
 echo "[THREADS] ${THREADS}"
+echo "[MIN_AF] ${MIN_AF}"
 echo "---------------------------------------------"
 
 # ================== FIND BAM FILE ==================
@@ -122,10 +124,10 @@ lofreq call-parallel \
 echo "[OK] Raw variant calling complete."
 
 # ================== FILTER BY ALLELE FREQUENCY ==================
-echo "[RUN] Filtering variants by allele frequency >= 0.05..."
+echo "[RUN] Filtering variants by allele frequency >= ${MIN_AF}..."
 
 lofreq filter \
-    -a 0.05 \
+    -a "$MIN_AF" \
     -i "$RAW_VCF_OUTPUT" \
     -o "$VCF_OUTPUT"
 
