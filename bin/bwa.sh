@@ -153,24 +153,22 @@ samtools flagstat "$FINAL_BAM" > "$FLAGSTAT_FILE"
 echo "biosample,filename,total_reads,mapped_reads,mapped_pct,duplicates_pct,properly_paired_pct,coverage_pct,status" > "$SUMMARY_CSV"
 
 # ===================== METRICS =====================
-total_reads=$(awk '/in total/ {print $1; exit}' "$FLAGSTAT_FILE")
+total_reads=$(awk '$0 ~ / in total / {print $1; exit}' "$FLAGSTAT_FILE")
 
-mapped_reads=$(awk '/primary mapped/ {print $1; exit}' "$FLAGSTAT_FILE")
-mapped_pct=$(awk -F'[()]' '/primary mapped/ {print $2}' "$FLAGSTAT_FILE" | awk '{print $1}')
+mapped_reads=$(awk '$0 ~ / primary mapped / {print $1; exit}' "$FLAGSTAT_FILE")
+mapped_pct=$(awk -F'[()%]' '$0 ~ / primary mapped / {print $2; exit}' "$FLAGSTAT_FILE")
 
-paired_pct=$(awk -F'[()]' '/properly paired/ {print $2}' "$FLAGSTAT_FILE" | awk '{print $1}')
+paired_pct=$(awk -F'[()%]' '$0 ~ / properly paired / {print $2; exit}' "$FLAGSTAT_FILE")
 
-dup_pct=$(awk '/primary duplicates/ {
-    print $1
-    exit
-}' "$FLAGSTAT_FILE")
+primary_reads=$(awk '$0 ~ / primary$/ {print $1; exit}' "$FLAGSTAT_FILE")
+primary_duplicates=$(awk '$0 ~ / primary duplicates$/ {print $1; exit}' "$FLAGSTAT_FILE")
 
-dup_total=$(awk '/primary/ {primary=$1} /primary duplicates/ {dup=$1} END {
-    if (primary > 0) printf "%.2f%%", (dup/primary)*100;
+dup_total=$(awk -v dup="$primary_duplicates" -v total="$primary_reads" 'BEGIN {
+    if (total > 0) printf "%.2f%%", (dup / total) * 100;
     else print "0.00%"
-}' "$FLAGSTAT_FILE")
+}')
 
-coverage_pct=$(samtools coverage "$FINAL_BAM" 2>/dev/null | awk 'NR==2 {print $6}')
+coverage_pct=$(samtools coverage "$FINAL_BAM" 2>/dev/null | awk 'NR==2 {print $6; exit}')
 [[ -z "$coverage_pct" ]] && coverage_pct="0.00"
 
 mapped_value=$(echo "$mapped_pct" | tr -d '%')
@@ -182,8 +180,7 @@ if (( $(echo "$mapped_value < $MIN_MAPPED" | bc -l) )) || \
     status="FAIL"
 fi
 
-echo "${BIOSAMPLE},${BIOSAMPLE}.bam,${total_reads},${mapped_reads},${mapped_pct},${dup_total},${paired_pct},${coverage_pct},${status}" >> "$SUMMARY_CSV"
-
+echo "${BIOSAMPLE},${BIOSAMPLE}.bam,${total_reads},${mapped_reads},${mapped_pct}%,${dup_total},${paired_pct}%,${coverage_pct},${status}" >> "$SUMMARY_CSV"
 rm -rf "$TMP_DIR"
 
 echo "[DONE] BWA finished for ${BIOSAMPLE} → ${status}"
