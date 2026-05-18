@@ -77,12 +77,12 @@ def process_biosample(biosample):
     # --------------------------------------------------------
     # Keep only PASS variants
     # --------------------------------------------------------
-    df = df[df["Filter_Status"] == "PASS"]
+    df = df[df["filter_status"] == "PASS"]
     if df.empty:
         return {"biosample": biosample}
 
     # Drugs appear already as normalized strings in CAPITAL/LOWER policy
-    drugs = sorted(df["Drug"].dropna().unique())
+    drugs = sorted(df["drug"].dropna().unique())
 
     result = {"biosample": biosample}
 
@@ -91,7 +91,7 @@ def process_biosample(biosample):
     # ========================================================
     for drug in drugs:
 
-        subset = df[df["Drug"] == drug]
+        subset = df[df["drug"] == drug]
         if subset.empty:
             continue
 
@@ -100,10 +100,10 @@ def process_biosample(biosample):
         for _, row in subset.iterrows():
 
             # row["Evidence"] already contains: R/r/u/s/S
-            phenotype_code = str(row["Evidence"]).strip()
+            phenotype_code = str(row["evidence"]).strip()
             flag_code = patterns.get(phenotype_code, "")
 
-            variant = row["Variant"]
+            variant = row["variant"]
             if pd.isna(variant):
                 continue
             variant = str(variant).strip()

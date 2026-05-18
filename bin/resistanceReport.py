@@ -41,12 +41,12 @@ PROJECT_DIR = Path(__file__).resolve().parent.parent
 INPUT_DIR  = PROJECT_DIR / "resistance"
 OUTPUT_DIR = PROJECT_DIR / "results" / "resistance"
 
-CALLER_PRIORITY = ["GATK", "NORM", "LOFREQ", "DELLY"]
+CALLER_PRIORITY = ["gatk", "norm", "lofreq", "delly"]
 
 FINAL_COLUMNS = [
-    "Drug","Gene","Tier","Variant","Effect","Evidence","Comment",
-    "AF","ALT_READS","Heteroresistance","Caller",
-    "Filter_Status","Filter_Method"
+    "drug","gene","tier","variant","effect","evidence","comment",
+    "af","alt_reads","heteroresistance",
+    "filter_status","filter_method","caller"
 ]
 
 EVIDENCE_MAP = {
@@ -72,15 +72,15 @@ def deduplicate_variants(df):
     # garantir tipo consistente para agrupamento
     df["alt"] = df["alt"].astype(str)
     df["position"] = df["position"].astype(int)
-    df["Drug"] = df["Drug"].astype(str)
-    df["Variant"] = df["Variant"].astype(str)
+    df["drug"] = df["drug"].astype(str)
+    df["variant"] = df["variant"].astype(str)
 
     final_rows = []
 
-    for _, group in df.groupby(["Drug","Variant","position","alt"], dropna=False):
+    for _, group in df.groupby(["drug","variant","position","alt"], dropna=False):
 
         # Check if any caller passed filtering
-        pass_rows = group[group["Filter_Status"] == "PASS"]
+        pass_rows = group[group["filter_status"] == "PASS"]
         if not pass_rows.empty:
             search_space = pass_rows
         else:
@@ -258,9 +258,9 @@ def process_biosample(biosample):
     df = resolve_complex_variants(df)
 
     # ===================== COLUMN MAPPING =====================
-    df["Drug"]  = df["drug"].astype(str)
-    df["Gene"]  = df["gene"].astype(str)
-    df["Tier"]  = df["tier"]
+    df["drug"]  = df["drug"].astype(str)
+    df["gene"]  = df["gene"].astype(str)
+    df["tier"]  = df["tier"]
 
     # Normalize NA
     df[["aa_change","master_change","nt_change"]] = df[
@@ -268,16 +268,17 @@ def process_biosample(biosample):
     ].fillna("NA")
 
     # Resolve change annotation priority
-    df["Variant"] = resolve_variant(df)
+    df["variant"] = resolve_variant(df)
 
-    df["Effect"]  = df["effect"]
-    df["Evidence"] = df["FINAL CONFIDENCE GRADING"].apply(convert_evidence)
-    df["AF"]       = df["AF"]
-    df["ALT_READS"] = df["ALT_reads"]
-    df["Heteroresistance"] = df["zygosity"]
-    df["Caller"]   = df["caller"]
-    df["Filter_Status"] = df["Filter_Status"]
-    df["Filter_Method"] = df["Filter_Method"]
+    df["effect"]  = df["effect"]
+    df["evidence"] = df["FINAL CONFIDENCE GRADING"].apply(convert_evidence)
+    df["comment"] = df["comment"] if "comment" in df.columns else ""
+    df["af"]       = df["af"]
+    df["alt_reads"] = df["alt_reads"]
+    df["heteroresistance"] = df["zygosity"]
+    df["caller"]   = df["caller"]
+    df["filter_status"] = df["filter_status"]
+    df["filter_method"] = df["filter_method"]
 
     # ===================== DEDUPLICATION =====================
 
@@ -285,7 +286,7 @@ def process_biosample(biosample):
     priority_map = {c:i for i,c in enumerate(CALLER_PRIORITY)}
 
     df = df.sort_values(
-        by=["Drug","Variant","position","alt","caller"],
+        by=["drug","variant","position","alt","caller"],
         key=lambda col: col.map(priority_map) if col.name=="caller" else col
     )
     
