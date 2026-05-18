@@ -585,7 +585,7 @@ process CLINICAL_REPORT {
     script:
     """
     cd "${projectDir}"
-    python bin/clinicalReport.py ${biosample} --table ${input_table}
+    python bin/clinicalReport.py ${biosample} --table "${input_table.toAbsolutePath()}"
     """
 }
 
