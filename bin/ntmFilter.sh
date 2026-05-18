@@ -76,28 +76,28 @@ echo "---------------------------------------------"
 # STEP 1 — CHECK LoFreq VARIANT
 # ============================================================
 
-AF=$(bcftools query \
+LOFREQ_LINE=$(bcftools query \
     -r "${REF_CHR}:${NTM_POS}-${NTM_POS}" \
-    -f '%INFO/AF\n' \
+    -f '%REF\t%ALT\t%INFO/AF\t%INFO/DP\n' \
     "$VCF_LOFREQ" 2>/dev/null | head -n 1 || true)
 
-GT_LF=$(bcftools query \
-    -r "${REF_CHR}:${NTM_POS}-${NTM_POS}" \
-    -f '[%GT]\n' \
-    "$VCF_LOFREQ" 2>/dev/null | head -n 1 || true)
-
-if [[ -n "$AF" ]]; then
+if [[ -n "$LOFREQ_LINE" ]]; then
     # LoFreq detected a variant
+    REF_ALLELE=$(echo "$LOFREQ_LINE" | cut -f1)
+    ALT_ALLELE=$(echo "$LOFREQ_LINE" | cut -f2)
+    AF=$(echo "$LOFREQ_LINE" | cut -f3)
+    DP_NUM=$(echo "$LOFREQ_LINE" | cut -f4)
+
     AF_NUM=$(printf "%.4f" "$AF")
+    DP_NUM=$(echo "${DP_NUM:-0}" | grep -Eo '^[0-9]+' || echo 0)
+
+    GT="${REF_ALLELE}/${ALT_ALLELE}"
 
     if (( $(echo "$AF_NUM >= $CUTOFF" | bc -l) )); then
         STATUS="FAIL"
     else
         STATUS="PASS"
     fi
-
-    DP_NUM="NA"
-    GT="$GT_LF"
 
 else
     # ============================================================
