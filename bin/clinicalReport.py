@@ -139,7 +139,41 @@ def get_lineage(biosample):
         pass
     return ""
 
+def resolve_input_table_path(table_path):
+    """
+    Resolve input table path for direct execution and Nextflow execution.
+
+    Accepts:
+    - input/input_table.csv
+    - input/input_table.xlsx
+    - input_table.csv
+    - input_table.xlsx
+    - absolute paths
+    """
+
+    # 1. As provided
+    if os.path.exists(table_path):
+        return table_path
+
+    # 2. Relative to project directory
+    project_relative = os.path.join(PROJECT_DIR, table_path)
+    if os.path.exists(project_relative):
+        return project_relative
+
+    # 3. If Nextflow passed only basename, look inside PROJECT_DIR/input/
+    input_relative = os.path.join(PROJECT_DIR, "input", os.path.basename(table_path))
+    if os.path.exists(input_relative):
+        return input_relative
+
+    raise FileNotFoundError(
+        f"Input table not found: {table_path}. "
+        f"Tried: {table_path}, {project_relative}, {input_relative}"
+    )
+
+
 def read_input_table(table_path):
+    table_path = resolve_input_table_path(table_path)
+
     ext = os.path.splitext(table_path)[1].lower()
 
     if ext == ".csv":
@@ -153,7 +187,10 @@ def read_input_table(table_path):
                 last_error = e
                 continue
 
-        raise RuntimeError(f"Could not decode input table as CSV: {table_path}. Last error: {last_error}")
+        raise RuntimeError(
+            f"Could not decode input table as CSV: {table_path}. "
+            f"Last error: {last_error}"
+        )
 
     if ext == ".xlsx":
         return pd.read_excel(table_path, dtype=str).fillna("")
@@ -187,8 +224,8 @@ def traduzir_farmaco_cov(cov_str, trad):
 def process_resistance(biosample):
 
     df = pd.read_excel(f"{RESISTANCE_DIR}/{biosample}.xlsx").fillna("")
-    df["Drug"] = df["Drug"].astype(str).str.lower().str.strip()
-    df["Evidence"] = df["Evidence"].astype(str).str.lower().str.strip()
+    df["drug"] = df["drug"].astype(str).str.lower().str.strip()
+    df["evidence"] = df["evidence"].astype(str).str.lower().str.strip()
 
     trad = {
         "amikacin":"Amicacina","bedaquiline":"Bedaquilina","capreomycin":"Capreomicina",
@@ -201,16 +238,16 @@ def process_resistance(biosample):
 
     try:
         df_dict = pd.read_excel(DICTIONARY, dtype=str).fillna("")
-        dict_map = dict(zip(df_dict["Comment"].str.strip(), df_dict["Tradução"].str.strip()))
+        dict_map = dict(zip(df_dict["comment"].str.strip(), df_dict["Tradução"].str.strip()))
     except:
         dict_map = {}
 
-    df["Comment"] = df["Comment"].apply(
+    df["comment"] = df["comment"].apply(
         lambda c: dict_map.get(str(c).strip(), str(c).strip())
     )
 
-    df_r = df[df["Evidence"] == "r"].copy()
-    df_pass = df_r[df_r["Filter_Status"] == "PASS"].copy()
+    df_r = df[df["evidence"] == "r"].copy()
+    df_pass = df_r[df_r["filter_status"] == "PASS"].copy()
 
     borderline_set = {
         "rpoB_p.Leu430Pro","rpoB_p.Leu452Pro","rpoB_p.His445Tyr","rpoB_p.His445Leu",
@@ -225,10 +262,10 @@ def process_resistance(biosample):
     borderline = []
 
     for _, row in df_pass.iterrows():
-        var = row["Variant"]
-        drug = row["Drug"]
-        het = str(row["Heteroresistance"]).upper() == "HET"
-        comment = row["Comment"].strip()
+        var = row["variant"]
+        drug = row["drug"]
+        het = str(row["heteroresistance"]).upper() == "HET"
+        comment = row["comment"].strip()
 
         idx = None
         if comment:
@@ -241,10 +278,10 @@ def process_resistance(biosample):
         if het:
             suffix += "ʰ"
             try:
-                af_fmt = f"{float(row['AF']):.2f}"
+                af_fmt = f"{float(row['af']):.2f}"
             except:
-                af_fmt = str(row["AF"])
-            alt_reads = str(row.get("ALT_READS", "")).strip()
+                af_fmt = str(row["af"])
+            alt_reads = str(row.get("alt_reads", "")).strip()
             hetero.append(f"{var} (AF: {af_fmt}; READS: {alt_reads})")
 
         if var in borderline_set:
@@ -258,16 +295,16 @@ def process_resistance(biosample):
 
     comentarios = "\n".join(f"{idx}. {text}" for text, idx in comment_map.items())
 
-    resistant_drugs = sorted(set(df_pass["Drug"]))
-    all_drugs = sorted(set(df["Drug"]))
+    resistant_drugs = sorted(set(df_pass["drug"]))
+    all_drugs = sorted(set(df["drug"]))
     sensitive_drugs = sorted(d for d in all_drugs if d not in resistant_drugs)
 
     trad_r = "\n\n".join([trad[d] for d in resistant_drugs])
     var_str = "\n\n".join(", ".join(variants_by_drug[d]) for d in resistant_drugs)
     trad_s = "\n".join([trad[d] for d in sensitive_drugs])
 
-    df_fail = df_r[df_r["Filter_Status"] != "PASS"]
-    fail_filters = ", ".join(df_fail["Variant"]) if not df_fail.empty else ""
+    df_fail = df_r[df_r["filter_status"] != "PASS"]
+    fail_filters = ", ".join(df_fail["variant"]) if not df_fail.empty else ""
 
     return trad_r, trad_s, var_str, comentarios, hetero, borderline, fail_filters, trad
 
