@@ -179,15 +179,30 @@ gatk SelectVariants -V "$COHORT_RAW" --select-type-to-include INDEL -O "$COHORT_
 # ============================================================
 gatk VariantFiltration \
     -V "$COHORT_SNPS" \
-    -filter "QD < 2.0"   --filter-name "QD2" \
-    -filter "QUAL < 30.0" --filter-name "QUAL30" \
-    -filter "FS > 60.0"  --filter-name "FS60" \
+    -filter "QD < 2.0" \
+    --filter-name "QD2" \
+    -filter "QUAL < 30.0" \
+    --filter-name "QUAL30" \
+    -filter "SOR > 3.0" \
+    --filter-name "SOR3" \
+    -filter "FS > 60.0" \
+    --filter-name "FS60" \
+    -filter "MQ < 40.0" \
+    --filter-name "MQ40" \
+    -filter "MQRankSum < -12.5" \
+    --filter-name "MQRankSum" \
+    -filter "ReadPosRankSum < -8.0" \
+    --filter-name "ReadPosRankSum" \
     -O "$SNPS_FILTERED"
 
 gatk VariantFiltration \
     -V "$COHORT_INDELS" \
-    -filter "QUAL < 30.0" --filter-name "QUAL30" \
-    -filter "FS > 200.0"  --filter-name "FS200" \
+    -filter "QUAL < 30.0" \
+    --filter-name "QUAL30" \
+    -filter "FS200 > 200.0" \
+    --filter-name "FS" \
+    -filter "ReadPosRankSum < -20.0" \
+    --filter-name "ReadPosRankSum" \
     -O "$INDELS_FILTERED"
 
 # ============================================================

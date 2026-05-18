@@ -49,6 +49,7 @@ for cmd in gatk samtools; do
 done
 
 # ================== DEFINE OUTPUTS ==================
+RAW_VCF="${OUTPUT_DIR}/${BIOSAMPLE}_gatk.raw.vcf.gz"
 VCF="${OUTPUT_DIR}/${BIOSAMPLE}_gatk.vcf.gz"
 
 # ================== SKIP IF RESULTS ALREADY EXIST ==================
@@ -78,7 +79,7 @@ LOG_VCF="${OUTPUT_DIR}/${BIOSAMPLE}_gatk_vcf.log"
 gatk HaplotypeCaller \
     -R "$REF" \
     -I "$BAM_FILE" \
-    -O "$VCF" \
+    -O "$RAW_VCF" \
     --max-mnp-distance 1 \
     --native-pair-hmm-threads "$THREADS" \
     -A FisherStrand \
@@ -90,10 +91,41 @@ gatk HaplotypeCaller \
     -A Coverage \
     2>&1 | tee "$LOG_VCF"
 
+gatk VariantFiltration \
+    -R "$REF" \
+    -V "$RAW_VCF" \
+    -O "$VCF" \
+    --filter-expression "vc.isSNP() && QD < 2.0" \
+    --filter-name "QD2" \
+    --filter-expression "vc.isSNP() && QUAL < 30.0" \
+    --filter-name "QUAL30" \
+    --filter-expression "vc.isSNP() && SOR > 3.0" \
+    --filter-name "SOR3" \
+    --filter-expression "vc.isSNP() && FS > 60.0" \
+    --filter-name "FS60" \
+    --filter-expression "vc.isSNP() && MQ < 40.0" \
+    --filter-name "MQ40" \
+    --filter-expression "vc.isSNP() && MQRankSum < -12.5" \
+    --filter-name "MQRankSum" \
+    --filter-expression "vc.isSNP() && ReadPosRankSum < -8.0" \
+    --filter-name "ReadPosRankSum" \
+    --filter-expression "vc.isIndel() && QUAL < 30.0" \
+    --filter-name "QUAL30" \
+    --filter-expression "vc.isIndel() && FS > 200.0" \
+    --filter-name "FS200" \
+    --filter-expression "vc.isIndel() && ReadPosRankSum < -20.0" \
+    --filter-name "ReadPosRankSum" \
+    2>&1 | tee -a "$LOG_VCF"
+    
+# ================== CLEAN RAW VCF ==================
+if [[ -f "$VCF" && -f "${VCF}.tbi" ]]; then
+    rm -f "$RAW_VCF" "${RAW_VCF}.tbi"
+    echo "[CLEAN] Removed raw VCF: $(basename "$RAW_VCF")"
+fi
+
 # ================== COMPLETION ==================
 ELAPSED=$(( SECONDS - START_TIME ))
 printf "[DONE] GATK VCF completed for %s (%02d min %02d sec)\n" \
     "$BIOSAMPLE" $((ELAPSED/60)) $((ELAPSED%60))
 
 echo "[OUT] VCF: $VCF"
-
