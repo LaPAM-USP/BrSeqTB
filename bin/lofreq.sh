@@ -20,13 +20,27 @@ START_TIME=$SECONDS
 
 BIOSAMPLE="${1:-}"
 THREADS="${2:-1}"
-MIN_AF="${3:-0.05}"
+MIN_AF="${3:-0.00}"
 
 PROJECT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 
 BWA_DIR="${PROJECT_DIR}/bwa/${BIOSAMPLE}"
 REF="${PROJECT_DIR}/database/mtbRef/NC0009623.fasta"
 OUTPUT_DIR="${PROJECT_DIR}/lofreq/${BIOSAMPLE}"
+
+# ================== VALIDATE MIN_AF ==================
+if ! [[ "$MIN_AF" =~ ^([0-9]+([.][0-9]+)?|[.][0-9]+)$ ]]; then
+    echo "[ERROR] MIN_AF must be a decimal number."
+    echo "        Examples: 0, 0.05, 0.10, 0.5, 1.0"
+    echo "        Received: ${MIN_AF}"
+    exit 1
+fi
+
+if ! awk -v af="$MIN_AF" 'BEGIN { exit !(af >= 0 && af <= 1) }'; then
+    echo "[ERROR] MIN_AF must be between 0 and 1."
+    echo "        Received: ${MIN_AF}"
+    exit 1
+fi
 
 # ================== CHECK INPUT ==================
 if [[ -z "$BIOSAMPLE" ]]; then
