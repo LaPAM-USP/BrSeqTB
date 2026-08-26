@@ -109,6 +109,8 @@ gatk VariantFiltration \
     --filter-name "MQRankSum" \
     --filter-expression "vc.isSNP() && ReadPosRankSum < -8.0" \
     --filter-name "ReadPosRankSum" \
+    --filter-expression "vc.isIndel() && QD < 2.0" \
+    --filter-name "QD2" \
     --filter-expression "vc.isIndel() && QUAL < 30.0" \
     --filter-name "QUAL30" \
     --filter-expression "vc.isIndel() && FS > 200.0" \
