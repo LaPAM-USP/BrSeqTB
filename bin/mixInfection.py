@@ -30,7 +30,7 @@ PROJECT_DIR = Path(
 TSV_ROOT = PROJECT_DIR / "mixInfection"
 BED_FILE = PROJECT_DIR / "database" / "omsCatalog" / "tbdr.bed"
 
-MIX_THRESHOLD = 0.35   # default threshold
+MIX_THRESHOLD = 0.32   # default threshold
 
 # ============================================================
 # Load BED regions (resistance positions to mask)
