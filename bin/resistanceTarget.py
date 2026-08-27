@@ -108,7 +108,7 @@ def gatk_norm_failures(filter_vcf, af, alt_reads, total_depth):
     if is_missing(alt_reads) or alt_reads < 3:
         failures.append("ALT_READS_BELOW_3")
 
-    if is_missing(af) or af < 0.05:
+    if is_missing(af) or af < 0.00:
         failures.append("AF_FAIL")
 
     if dp < 10:
