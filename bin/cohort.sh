@@ -197,6 +197,8 @@ gatk VariantFiltration \
 
 gatk VariantFiltration \
     -V "$COHORT_INDELS" \
+    -filter "QD < 2.0" \
+    --filter-name "QD2" \
     -filter "QUAL < 30.0" \
     --filter-name "QUAL30" \
     -filter "FS200 > 200.0" \
