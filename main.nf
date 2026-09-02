@@ -14,7 +14,7 @@ params.readsNaming       = "illumina"
 params.auxCohort = false
 params.module = null  // Example: bwa, trimmomatic, cohort, etc.
 params.exclude = null
-params.lofreqMinAf      = 0.05
+params.lofreqMinAf      = 0.00
 
 /*
  * ============================================================
