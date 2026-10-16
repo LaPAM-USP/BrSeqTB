@@ -7,6 +7,7 @@
 # Output:
 #   resistance/<biosample ID>/*_{caller}_ANN.xlsx
 #   resistance/<biosample ID>/<biosample ID>_OMStarget.xlsx
+#   resistance/<biosample ID>/<biosample ID>_lofreq_damage_summary.csv
 # Reference:
 #   database/omsCatalog/tbdr_genomic_coordinates.csv
 #   database/omsCatalog/tbdr_catalogue_master_file.csv
@@ -45,6 +46,17 @@ VCF_CALLERS = {
     "lofreq": "_lofreq.vcf.gz",
     "delly": "_delly.vcf.gz"
 }
+
+# ------------------------------------------------------------
+# Oxidative-damage (8-oxoG) guard for LoFreq minor variants
+# A sample is flagged when its low-AF LoFreq SNVs are dominated by
+# G>T / C>A. In flagged samples only, low-AF G>T / C>A LoFreq calls
+# fail filtering instead of driving an R/r interpretation.
+# ------------------------------------------------------------
+DAMAGE_AF_MAX = 0.05
+DAMAGE_MIN_CALLS = 200
+DAMAGE_MIN_FRACTION = 0.80
+DAMAGE_SUBSTITUTIONS = {("G", "T"), ("C", "A")}
 
 # ============================================================
 # FILTER HELPERS
@@ -117,7 +129,13 @@ def gatk_norm_failures(filter_vcf, af, alt_reads, total_depth):
     return failures
 
 
-def lofreq_failures(filter_vcf, alt_reads, total_depth):
+def is_damage_type(ref, alt):
+    if is_missing(ref) or is_missing(alt):
+        return False
+    return (str(ref).upper(), str(alt).upper()) in DAMAGE_SUBSTITUTIONS
+
+
+def lofreq_failures(filter_vcf, alt_reads, total_depth, ref=None, alt=None, af=None, sample_damaged=False):
 
     failures = []
 
@@ -130,6 +148,15 @@ def lofreq_failures(filter_vcf, alt_reads, total_depth):
     dp = total_depth if not is_missing(total_depth) else 0
     if dp < 10:
         failures.append("DP_FAIL")
+
+    # Low-AF G>T / C>A in a sample flagged for oxidative damage
+    if (
+        sample_damaged
+        and is_damage_type(ref, alt)
+        and not is_missing(af)
+        and af < DAMAGE_AF_MAX
+    ):
+        failures.append("OXIDATIVE_DAMAGE_SUSPECT")
 
     return failures
 
@@ -151,7 +178,10 @@ def define_filter_status(
     alt_reads,
     total_depth,
     filter_vcf,
-    filter_df=None
+    filter_df=None,
+    ref=None,
+    alt=None,
+    sample_damaged=False
 ):
 
     # ========================================================
@@ -180,14 +210,19 @@ def define_filter_status(
 
     # ========================================================
     # LOFREQ
-    # Needs PASS in VCF FILTER and at least 3 ALT reads
+    # Needs PASS in VCF FILTER and at least 3 ALT reads.
+    # In damage-flagged samples, low-AF G>T / C>A also fails.
     # ========================================================
     if caller == "lofreq":
 
         per_sample_fails = lofreq_failures(
             filter_vcf=filter_vcf,
             alt_reads=alt_reads,
-            total_depth=total_depth
+            total_depth=total_depth,
+            ref=ref,
+            alt=alt,
+            af=af,
+            sample_damaged=sample_damaged
         )
 
         if per_sample_fails:
@@ -214,10 +249,53 @@ def define_filter_status(
 
 
 # ============================================================
+# OXIDATIVE DAMAGE PROFILE (LoFreq)
+# Counts PASS SNVs below DAMAGE_AF_MAX and how many are G>T / C>A
+# ============================================================
+
+def lofreq_damage_profile(vcf_file):
+
+    vcf = pysam.VariantFile(vcf_file)
+
+    low_af_snvs = 0
+    low_af_damage = 0
+
+    for record in vcf:
+        if get_record_filter(record) != "PASS":
+            continue
+
+        alt_alleles = record.alts or []
+        if len(record.ref) != 1 or len(alt_alleles) != 1 or len(alt_alleles[0]) != 1:
+            continue
+
+        af = get_first_af(record.info.get("AF", None))
+        if is_missing(af) or af >= DAMAGE_AF_MAX:
+            continue
+
+        low_af_snvs += 1
+        if is_damage_type(record.ref, alt_alleles[0]):
+            low_af_damage += 1
+
+    damage_fraction = low_af_damage / low_af_snvs if low_af_snvs > 0 else 0.0
+
+    sample_damaged = (
+        low_af_damage >= DAMAGE_MIN_CALLS
+        and damage_fraction >= DAMAGE_MIN_FRACTION
+    )
+
+    return {
+        "low_af_snvs": low_af_snvs,
+        "low_af_damage_snvs": low_af_damage,
+        "damage_fraction": round(damage_fraction, 4),
+        "sample_damaged": sample_damaged,
+    }
+
+
+# ============================================================
 # ANNOTATION
 # ============================================================
 
-def recover_annotation(vcf_file, caller):
+def recover_annotation(vcf_file, caller, sample_damaged=False):
 
     vcf = pysam.VariantFile(vcf_file)
     annotations = []
@@ -351,7 +429,10 @@ def recover_annotation(vcf_file, caller):
                 alt_reads=ar,
                 total_depth=Total_depth,
                 filter_vcf=filter_vcf,
-                filter_df=filter_df
+                filter_df=filter_df,
+                ref=ref,
+                alt=alt,
+                sample_damaged=sample_damaged
             )
 
             annotations.append([
@@ -583,7 +664,29 @@ def vcf_to_df(biosample, vcf_path):
     print(f"   ANN   : {ann_out}")
     print("---------------------------------------------")
 
-    df_ann = recover_annotation(vcf_path, caller)
+    # Oxidative-damage profile (LoFreq only)
+    sample_damaged = False
+
+    if caller == "lofreq":
+        profile = lofreq_damage_profile(vcf_path)
+        sample_damaged = profile["sample_damaged"]
+
+        damage_out = os.path.join(results_dir, f"{biosample}_lofreq_damage_summary.csv")
+        pd.DataFrame([{
+            "biosample": biosample,
+            "low_af_snvs": profile["low_af_snvs"],
+            "low_af_damage_snvs": profile["low_af_damage_snvs"],
+            "damage_fraction": profile["damage_fraction"],
+            "af_max": DAMAGE_AF_MAX,
+            "min_calls": DAMAGE_MIN_CALLS,
+            "min_fraction": DAMAGE_MIN_FRACTION,
+            "status": "FLAG" if sample_damaged else "PASS",
+        }]).to_csv(damage_out, index=False)
+
+        print(f"   DAMAGE: {profile['low_af_damage_snvs']}/{profile['low_af_snvs']} "
+              f"low-AF SNVs are G>T/C>A → {'FLAG' if sample_damaged else 'PASS'}")
+
+    df_ann = recover_annotation(vcf_path, caller, sample_damaged=sample_damaged)
     df_ann = normalize_ann(df_ann)
 
     # Save full ANN table for this caller
