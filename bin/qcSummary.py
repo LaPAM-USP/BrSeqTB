@@ -14,6 +14,7 @@
 #   kaiju/<biosample>/<biosample>_kaiju_summary.csv
 #   lineage/<biosample>/<biosample>_lineage_summary.csv
 #   tbdrRCov/<biosample>/<biosample>_tbdrRcov_summary.csv   ← NOVO
+#   resistance/<biosample>/<biosample>_lofreq_damage_summary.csv
 #
 # [OUT]
 #   results/qc_summary.xlsx
@@ -44,6 +45,7 @@ INPUT_DIRS = {
     "kaiju":        os.path.join(PROJECT_DIR, "kaiju"),
     "lineage":      os.path.join(PROJECT_DIR, "lineage"),
     "tbdrRCov":     os.path.join(PROJECT_DIR, "tbdrRCov"),
+    "lofreqDamage": os.path.join(PROJECT_DIR, "resistance"),
 }
 
 SUMMARY_SUFFIX = {
@@ -55,6 +57,7 @@ SUMMARY_SUFFIX = {
     "kaiju":       "_kaiju_summary.csv",
     "lineage":     "_lineage_summary.csv",
     "tbdrRCov":    "_tbdrRcov_summary.csv",
+    "lofreqDamage":"_lofreq_damage_summary.csv",
 }
 
 KAIJU_IGNORE = {
@@ -154,6 +157,7 @@ def main():
         "kaiju": [],
         "lineage": [],
         "tbdrRCov": [],  # ← NEW
+        "lofreqDamage": [],
     }
 
     # --------------------------------------------------------
@@ -162,7 +166,7 @@ def main():
     for biosample in biosamples:
 
         # direct concatenation
-        for analysis in ["fastqc","trimmomatic","bwa","ntmFilter","mixInfection"]:
+        for analysis in ["fastqc","trimmomatic","bwa","ntmFilter","mixInfection","lofreqDamage"]:
             df = read_summary_file(INPUT_DIRS[analysis], biosample, SUMMARY_SUFFIX[analysis])
             if df is not None and not df.empty:
                 tables[analysis].append(df)
@@ -194,7 +198,7 @@ def main():
     with pd.ExcelWriter(OUTPUT_FILE, engine="xlsxwriter") as writer:
 
         # direct sheets
-        for analysis in ["fastqc","trimmomatic","bwa","ntmFilter","mixInfection"]:
+        for analysis in ["fastqc","trimmomatic","bwa","ntmFilter","mixInfection","lofreqDamage"]:
             if tables[analysis]:
                 pd.concat(tables[analysis], ignore_index=True).to_excel(
                     writer, sheet_name=analysis, index=False
