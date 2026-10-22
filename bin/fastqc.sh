@@ -58,7 +58,7 @@ fi
 
 # ======== FIND FILES (anchored prefix) ========
 # Strictly match Illumina-style names for this biosample (supports multiple lanes)
-FILES=$(find "$READS_DIR" -maxdepth 1 -type f \
+FILES=$(find -L "$READS_DIR" -maxdepth 1 -type f \
     \( -name "${BIOSAMPLE}_S*_L*_R*_001.fastq.gz" -o -name "${BIOSAMPLE}_S*_L*_R*_001.fastq" \) \
     | sort)
 
