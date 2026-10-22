@@ -593,12 +593,36 @@ workflow {
 
     /*
      * ============================================================
-     * INIT (SEQUENTIAL) — SEMPRE EXECUTA
+     * EXCLUSÕES PERMITIDAS (SOMENTE FULL PIPELINE)
      * ============================================================
      */
 
-    init_done = Channel.value(true)
-        | KAIJU_DB
+    def excluded = params.exclude ?
+        params.exclude.split(',')*.trim() :
+        []
+
+    def allowed_exclusions = ['kaiju','iqtree','transmission','clinical_report']
+
+    excluded.each {
+        if (!allowed_exclusions.contains(it)) {
+            error "Exclusão inválida: ${it}. Permitidos: ${allowed_exclusions}"
+        }
+    }
+
+    /*
+     * ============================================================
+     * INIT (SEQUENTIAL) — SEMPRE EXECUTA
+     * KAIJU_DB é pulado com --exclude kaiju (full pipeline)
+     * ============================================================
+     */
+
+    def skip_kaiju_db = !params.module && excluded.contains('kaiju')
+
+    kaiju_db_done = skip_kaiju_db ?
+        Channel.value(true) :
+        KAIJU_DB(Channel.value(true))
+
+    init_done = kaiju_db_done
         | OMS_CATALOG
         | BWA_REF
         | GATK_DICT
@@ -626,25 +650,6 @@ workflow {
     samples_ch = manifest_ch
         .splitCsv(header:true, sep:'\t')
         .map { row -> row.biosample }
-
-
-    /*
-     * ============================================================
-     * EXCLUSÕES PERMITIDAS (SOMENTE FULL PIPELINE)
-     * ============================================================
-     */
-
-    def excluded = params.exclude ?
-        params.exclude.split(',')*.trim() :
-        []
-
-    def allowed_exclusions = ['kaiju','iqtree','transmission','clinical_report']
-
-    excluded.each {
-        if (!allowed_exclusions.contains(it)) {
-            error "Exclusão inválida: ${it}. Permitidos: ${allowed_exclusions}"
-        }
-    }
 
 
     /*
