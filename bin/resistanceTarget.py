@@ -51,12 +51,15 @@ VCF_CALLERS = {
 # Oxidative-damage (8-oxoG) guard for LoFreq minor variants
 # A sample is flagged when its low-AF LoFreq SNVs are dominated by
 # G>T / C>A. In flagged samples only, low-AF G>T / C>A LoFreq calls
+# that snpEff annotates as loss of function (stop gained / start lost)
 # fail filtering instead of driving an R/r interpretation.
+# Missense, synonymous and non-coding calls are not affected.
 # ------------------------------------------------------------
 DAMAGE_AF_MAX = 0.05
 DAMAGE_MIN_CALLS = 200
 DAMAGE_MIN_FRACTION = 0.80
 DAMAGE_SUBSTITUTIONS = {("G", "T"), ("C", "A")}
+DAMAGE_LOF_EFFECTS = {"stop_gained", "start_lost"}
 
 # ============================================================
 # FILTER HELPERS
@@ -135,7 +138,14 @@ def is_damage_type(ref, alt):
     return (str(ref).upper(), str(alt).upper()) in DAMAGE_SUBSTITUTIONS
 
 
-def lofreq_failures(filter_vcf, alt_reads, total_depth, ref=None, alt=None, af=None, sample_damaged=False):
+def is_lof_effect(effect):
+    # snpEff joins multiple effects with '&' (e.g. stop_gained&splice_region_variant)
+    if is_missing(effect):
+        return False
+    return any(term in DAMAGE_LOF_EFFECTS for term in str(effect).split("&"))
+
+
+def lofreq_failures(filter_vcf, alt_reads, total_depth, ref=None, alt=None, af=None, effect=None, sample_damaged=False):
 
     failures = []
 
@@ -149,10 +159,11 @@ def lofreq_failures(filter_vcf, alt_reads, total_depth, ref=None, alt=None, af=N
     if dp < 10:
         failures.append("DP_FAIL")
 
-    # Low-AF G>T / C>A in a sample flagged for oxidative damage
+    # Low-AF G>T / C>A loss of function in a sample flagged for oxidative damage
     if (
         sample_damaged
         and is_damage_type(ref, alt)
+        and is_lof_effect(effect)
         and not is_missing(af)
         and af < DAMAGE_AF_MAX
     ):
@@ -181,6 +192,7 @@ def define_filter_status(
     filter_df=None,
     ref=None,
     alt=None,
+    effect=None,
     sample_damaged=False
 ):
 
@@ -211,7 +223,7 @@ def define_filter_status(
     # ========================================================
     # LOFREQ
     # Needs PASS in VCF FILTER and at least 3 ALT reads.
-    # In damage-flagged samples, low-AF G>T / C>A also fails.
+    # In damage-flagged samples, low-AF G>T / C>A loss of function also fails.
     # ========================================================
     if caller == "lofreq":
 
@@ -222,6 +234,7 @@ def define_filter_status(
             ref=ref,
             alt=alt,
             af=af,
+            effect=effect,
             sample_damaged=sample_damaged
         )
 
@@ -389,7 +402,7 @@ def recover_annotation(vcf_file, caller, sample_damaged=False):
             entries = ann_by_alt.get(alt, [])
 
             if not entries:
-                parsed_ann.append(("NA", "NA"))
+                parsed_ann.append(("NA", "NA", "NA"))
                 continue
 
             selected = None
@@ -400,24 +413,25 @@ def recover_annotation(vcf_file, caller, sample_damaged=False):
                     break
 
             if not selected:
-                parsed_ann.append(("NA", "NA"))
+                parsed_ann.append(("NA", "NA", "NA"))
                 continue
 
             gene = selected[3] if selected[3] else "NA"
             genic = selected[9] if selected[9] else "NA"
             prot = selected[10] if selected[10] else "NA"
+            effect = selected[1] if selected[1] else "NA"
 
             nt = f"{gene}_{genic}" if genic != "NA" else "NA"
             aa = f"{gene}_{prot}" if prot != "NA" else "NA"
 
-            parsed_ann.append((nt, aa))
+            parsed_ann.append((nt, aa, effect))
 
         # ============================================================
         # OUTPUT ROWS
         # ============================================================
 
         for i, alt in enumerate(alt_alleles):
-            nt, aa = parsed_ann[i]
+            nt, aa, effect = parsed_ann[i]
             af = AF_list[i] if i < len(AF_list) else None
             ar = ALT_reads_list[i] if i < len(ALT_reads_list) else None
             zy = zygosity_list[i] if i < len(zygosity_list) else "NA"
@@ -432,6 +446,7 @@ def recover_annotation(vcf_file, caller, sample_damaged=False):
                 filter_df=filter_df,
                 ref=ref,
                 alt=alt,
+                effect=effect,
                 sample_damaged=sample_damaged
             )
 
@@ -441,6 +456,7 @@ def recover_annotation(vcf_file, caller, sample_damaged=False):
                 alt,
                 nt,
                 aa,
+                effect,
                 zy,
                 af,
                 ar,
@@ -457,6 +473,7 @@ def recover_annotation(vcf_file, caller, sample_damaged=False):
         "alt",
         "nt_change",
         "aa_change",
+        "snpeff_effect",
         "zygosity",
         "af",
         "alt_reads",
