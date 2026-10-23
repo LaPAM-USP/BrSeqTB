@@ -54,7 +54,7 @@ fi
 
 # ================== FIND PAIRED READS (SAFE) ==================
 mapfile -t R1_FILES < <(
-    find "$READS_DIR" -maxdepth 1 -type f \
+    find -L "$READS_DIR" -maxdepth 1 -type f \
         -name "${BIOSAMPLE}_S*_L*_R1_001.fastq.gz" | sort
 )
 

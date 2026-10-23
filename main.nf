@@ -116,6 +116,8 @@ process MAKE_MANIFEST_VALIDATE {
 
     tag "manifest"
 
+    publishDir "${projectDir}", mode: 'copy'
+
     input:
         val token
         path input_table
@@ -124,8 +126,6 @@ process MAKE_MANIFEST_VALIDATE {
 
     output:
         path "manifest.tsv"
-
-    publishDir "${projectDir}", mode: 'copy'
 
     script:
     """
@@ -593,12 +593,36 @@ workflow {
 
     /*
      * ============================================================
-     * INIT (SEQUENTIAL) — SEMPRE EXECUTA
+     * EXCLUSÕES PERMITIDAS (SOMENTE FULL PIPELINE)
      * ============================================================
      */
 
-    init_done = Channel.value(true)
-        | KAIJU_DB
+    def excluded = params.exclude ?
+        params.exclude.split(',')*.trim() :
+        []
+
+    def allowed_exclusions = ['kaiju','iqtree','transmission','clinical_report']
+
+    excluded.each {
+        if (!allowed_exclusions.contains(it)) {
+            error "Exclusão inválida: ${it}. Permitidos: ${allowed_exclusions}"
+        }
+    }
+
+    /*
+     * ============================================================
+     * INIT (SEQUENTIAL) — SEMPRE EXECUTA
+     * KAIJU_DB é pulado com --exclude kaiju (full pipeline)
+     * ============================================================
+     */
+
+    def skip_kaiju_db = !params.module && excluded.contains('kaiju')
+
+    kaiju_db_done = skip_kaiju_db ?
+        Channel.value(true) :
+        KAIJU_DB(Channel.value(true))
+
+    init_done = kaiju_db_done
         | OMS_CATALOG
         | BWA_REF
         | GATK_DICT
@@ -630,66 +654,48 @@ workflow {
 
     /*
      * ============================================================
-     * EXCLUSÕES PERMITIDAS (SOMENTE FULL PIPELINE)
-     * ============================================================
-     */
-
-    def excluded = params.exclude ?
-        params.exclude.split(',')*.trim() :
-        []
-
-    def allowed_exclusions = ['kaiju','iqtree','transmission','clinical_report']
-
-    excluded.each {
-        if (!allowed_exclusions.contains(it)) {
-            error "Exclusão inválida: ${it}. Permitidos: ${allowed_exclusions}"
-        }
-    }
-
-
-    /*
-     * ============================================================
      * MODO MÓDULO (EXECUÇÃO ISOLADA)
      * ============================================================
      */
 
     if (params.module) {
 
-        switch (params.module) {
+        // if / else if chain: strict syntax (Nextflow >= 25.10) has no switch
+        def module = params.module
 
-            case 'fastqc': FASTQC(samples_ch); break
-            case 'trimmomatic': TRIMMOMATIC(samples_ch); break
-            case 'kaiju': KAIJU(samples_ch); break
-            case 'bwa': BWA(samples_ch); break
-            case 'delly': DELLY(samples_ch); break
-            case 'lofreq': LOFREQ(samples_ch); break
-            case 'gatk_gvcf': GATK_GVCF(samples_ch); break
-            case 'gatk_vcf': GATK_VCF(samples_ch); break
-            case 'norm': NORM(samples_ch); break
-            case 'tbdr_rcov': TBDR_RCOV(samples_ch); break
-            case 'lineage': LINEAGE(samples_ch); break
-            case 'ntm_filter': NTM_FILTER(samples_ch); break
-            case 'snpeff': SNPEFF(samples_ch); break
+        if (module == 'fastqc') { FASTQC(samples_ch) }
+        else if (module == 'trimmomatic') { TRIMMOMATIC(samples_ch) }
+        else if (module == 'kaiju') { KAIJU(samples_ch) }
+        else if (module == 'bwa') { BWA(samples_ch) }
+        else if (module == 'delly') { DELLY(samples_ch) }
+        else if (module == 'lofreq') { LOFREQ(samples_ch) }
+        else if (module == 'gatk_gvcf') { GATK_GVCF(samples_ch) }
+        else if (module == 'gatk_vcf') { GATK_VCF(samples_ch) }
+        else if (module == 'norm') { NORM(samples_ch) }
+        else if (module == 'tbdr_rcov') { TBDR_RCOV(samples_ch) }
+        else if (module == 'lineage') { LINEAGE(samples_ch) }
+        else if (module == 'ntm_filter') { NTM_FILTER(samples_ch) }
+        else if (module == 'snpeff') { SNPEFF(samples_ch) }
 
-            case 'cohort':
-                cohort_input_ch = manifest_ch
-                    .map { file -> tuple(file, params.auxCohort) }
-                COHORT(Channel.value(true), cohort_input_ch)
-                break
+        else if (module == 'cohort') {
+            cohort_input_ch = manifest_ch
+                .map { file -> tuple(file, params.auxCohort) }
+            COHORT(Channel.value(true), cohort_input_ch)
+        }
 
-            case 'cohort_filter': COHORT_FILTER(Channel.value(true)); break
-            case 'snp_matrix': SNP_MATRIX(Channel.value(true)); break
-            case 'transmission': TRANSMISSION(Channel.value(true)); break
-            case 'iqtree': IQTREE(Channel.value(true)); break
-            case 'mix_infection': MIX_INFECTION(samples_ch); break
-            case 'resistance_target': RESISTANCE_TARGET(samples_ch); break
-            case 'resistance_report': RESISTANCE_REPORT(samples_ch); break
-            case 'resistance_summary': RESISTANCE_SUMMARY(Channel.value(true)); break
-            case 'qc_summary': QC_SUMMARY(Channel.value(true)); break
-            case 'clinical_report': CLINICAL_REPORT(samples_ch, file(params.inputTable)); break
+        else if (module == 'cohort_filter') { COHORT_FILTER(Channel.value(true)) }
+        else if (module == 'snp_matrix') { SNP_MATRIX(Channel.value(true)) }
+        else if (module == 'transmission') { TRANSMISSION(Channel.value(true)) }
+        else if (module == 'iqtree') { IQTREE(Channel.value(true)) }
+        else if (module == 'mix_infection') { MIX_INFECTION(samples_ch) }
+        else if (module == 'resistance_target') { RESISTANCE_TARGET(samples_ch) }
+        else if (module == 'resistance_report') { RESISTANCE_REPORT(samples_ch) }
+        else if (module == 'resistance_summary') { RESISTANCE_SUMMARY(Channel.value(true)) }
+        else if (module == 'qc_summary') { QC_SUMMARY(Channel.value(true)) }
+        else if (module == 'clinical_report') { CLINICAL_REPORT(samples_ch, file(params.inputTable)) }
 
-            default:
-                error "Módulo inválido: ${params.module}"
+        else {
+            error "Módulo inválido: ${params.module}"
         }
 
     } else {
@@ -808,7 +814,7 @@ workflow {
 
         bloco3_samples_ch = samples_ch
             .combine(bloco2_sync)
-            .map { biosample, _ -> biosample }
+            .map { biosample, _sync -> biosample }
 
         mix_infection_ch      = MIX_INFECTION(bloco3_samples_ch)
         resistance_target_ch  = RESISTANCE_TARGET(bloco3_samples_ch)
@@ -829,7 +835,7 @@ workflow {
 
         clinical_samples_ch = samples_ch
             .combine(bloco4_sync)
-            .map { biosample, _ -> biosample }
+            .map { biosample, _sync -> biosample }
 
         if (!excluded.contains('clinical_report')) {
             clinical_report_ch = CLINICAL_REPORT(clinical_samples_ch,file(params.inputTable))

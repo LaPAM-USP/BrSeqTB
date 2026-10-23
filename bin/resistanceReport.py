@@ -14,6 +14,9 @@
 # Output:
 #   results/resistance/<biosample ID>.xlsx
 #       → Final deduplicated and curated resistance report
+#   resistance/<biosample ID>/<biosample ID>_oxidative_damage.csv
+#       → Calls removed as oxidative damage, with the reason (only written
+#         when there are any; read by qcSummary.py)
 #
 # Rules:
 #   1. Keep both PASS/FAIL variants.
@@ -26,6 +29,9 @@
 #         GATK > NORM > LOFREQ > DELLY
 #   5. Evidence values converted to:
 #         R / r / u / s / S
+#   6. Calls failing with OXIDATIVE_DAMAGE_SUSPECT (low-AF G>T / C>A
+#      loss of function in a damage-flagged sample) are removed from the
+#      report and written to the oxidative damage QC file instead.
 #
 # ============================================================
 
@@ -47,6 +53,13 @@ FINAL_COLUMNS = [
     "drug","gene","tier","variant","effect","evidence","comment",
     "af","alt_reads","heteroresistance",
     "filter_status","filter_method","caller"
+]
+
+DAMAGE_STATUS = "OXIDATIVE_DAMAGE_SUSPECT"
+
+DAMAGE_COLUMNS = [
+    "biosample","drug","gene","variant","snpeff_effect","evidence",
+    "position","ref","alt","af","alt_reads","caller","filter_status","reason"
 ]
 
 EVIDENCE_MAP = {
@@ -229,6 +242,49 @@ def resolve_variant(df):
 
     return variant
 
+
+def damage_reason(row, profile):
+
+    # Why a call was removed as oxidative damage
+    try:
+        af_txt = f"{float(row['af']):.1%}"
+    except (TypeError, ValueError):
+        af_txt = str(row["af"])
+
+    reason = (
+        f"{row['snpeff_effect']} from a {row['ref']}>{row['alt']} change at AF {af_txt} "
+        f"(below 5%) in a sample flagged for oxidative damage"
+    )
+
+    if profile is not None:
+        reason += (
+            f" ({int(profile['low_af_damage_snvs'])} of {int(profile['low_af_snvs'])} "
+            f"low-AF SNVs are G>T/C>A)"
+        )
+
+    return reason
+
+
+def write_damage_qc(biosample, removed):
+
+    # Calls removed as oxidative damage → resistance/<biosample>/<biosample>_oxidative_damage.csv
+    damage_csv = INPUT_DIR / biosample / f"{biosample}_oxidative_damage.csv"
+
+    if removed.empty:
+        damage_csv.unlink(missing_ok=True)
+        return
+
+    profile_csv = INPUT_DIR / biosample / f"{biosample}_lofreq_damage_summary.csv"
+    profile = pd.read_csv(profile_csv).iloc[0] if profile_csv.exists() else None
+
+    removed = removed.copy()
+    removed["biosample"] = biosample
+    removed["reason"] = removed.apply(lambda row: damage_reason(row, profile), axis=1)
+
+    removed[DAMAGE_COLUMNS].to_csv(damage_csv, index=False)
+
+    print(f"[OK] {len(removed)} oxidative damage call(s) moved to QC → {damage_csv}")
+
 # ============================================================
 # CORE PROCESS
 # ============================================================
@@ -290,7 +346,14 @@ def process_biosample(biosample):
         key=lambda col: col.map(priority_map) if col.name=="caller" else col
     )
     
-    final = deduplicate_variants(df)[FINAL_COLUMNS]
+    deduplicated = deduplicate_variants(df)
+
+    # ===================== OXIDATIVE DAMAGE =====================
+    # Removed from the report; listed in qc_summary instead
+    is_damage = deduplicated["filter_status"].astype(str).str.contains(DAMAGE_STATUS)
+    write_damage_qc(biosample, deduplicated[is_damage])
+
+    final = deduplicated[~is_damage][FINAL_COLUMNS]
 
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
     final.to_excel(output_xlsx, index=False)

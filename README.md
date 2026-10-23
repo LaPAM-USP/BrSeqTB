@@ -354,12 +354,21 @@ brseqtb --module trimmomatic
 ```
 
 ### Set the Minimum Allele Frequency for LoFreq
-By default, LoFreq variants are filtered using a minimum allele frequency of `0.05`.
+By default, LoFreq variants are not filtered by allele frequency (`0.00`), so minor variants are kept.
 
 ```bash
 brseqtb --lofreqMinAf 0.10
 brseqtb --module lofreq --lofreqMinAf 0.10
 ```
+
+### Oxidative-Damage Guard for LoFreq Minor Variants
+Libraries with oxidative DNA damage (8-oxoG) produce many low-frequency G>T / C>A calls that LoFreq reports as PASS. `resistanceTarget.py` scores each sample from its LoFreq VCF:
+
+* **Score:** PASS SNVs with AF < `0.05`, and how many of them are G>T or C>A.
+* **Flag:** the sample is flagged when at least `200` of those SNVs are G>T / C>A **and** they make up at least `80%` of them.
+* **Effect:** in flagged samples only, LoFreq SNVs with AF < `0.05` that are G>T / C>A **and** that snpEff annotates as loss of function (`stop_gained` or `start_lost`) get `OXIDATIVE_DAMAGE_SUSPECT` in `filter_status`. These calls are removed from the per-isolate tables (`results/resistance/<biosample>.xlsx`), the resistance summary and the clinical report, and are listed with the reason in the `oxidative_damage` sheet of `results/qc_summary.xlsx`. Missense, synonymous and non-coding G>T / C>A calls, and all calls in unflagged samples, follow the normal filters.
+
+The `oxidative_damage` sheet holds the whole check: every sample's score and FLAG/PASS status, and for flagged samples one row per removed call with the reason. Its sources are `resistance/<biosample>/<biosample>_lofreq_damage_summary.csv` (score) and `resistance/<biosample>/<biosample>_oxidative_damage.csv` (removed calls). A flagged sample should be re-sequenced from a new library. Thresholds are set at the top of `bin/resistanceTarget.py` (`DAMAGE_AF_MAX`, `DAMAGE_MIN_CALLS`, `DAMAGE_MIN_FRACTION`, `DAMAGE_LOF_EFFECTS`).
 
 > ⚠ **Important — Module Dependencies:**
 > Although modules can be executed individually, they **respect the logical dependencies defined in the workflow DAG**.
@@ -408,7 +417,7 @@ brseqtb --exclude transmission,iqtree
 | --readsDir | Directory containing input FASTQ files organized by biosample. Default: reads/. |
 | --readsNaming | FASTQ naming convention. Options: `illumina` (default) or `simplified` (<BIOSAMPLE>_1.fastq.gz). |
 | --addKaijuManually     | If true, skips automatic Kaiju database download and expects the database to be already present locally in database/kaiju. |
-| --lofreqMinAf | Minimum allele frequency used to filter LoFreq variants. Default: 0.05. For example, `--lofreqMinAf 0.10` keeps only LoFreq variants with AF >= 0.10. This parameter applies both to full pipeline execution and to isolated LoFreq module execution. |
+| --lofreqMinAf | Minimum allele frequency used to filter LoFreq variants. Default: 0.00 (no AF filter). For example, `--lofreqMinAf 0.10` keeps only LoFreq variants with AF >= 0.10. This parameter applies both to full pipeline execution and to isolated LoFreq module execution. |
 | --auxCohort         | When activated, BrSeqTB supplements the user dataset with a predefined reference panel of ~10 high-quality TB-DR genomes during the cohort construction and variant filtering stages.     |
 | --module | Executes a single workflow module instead of the full pipeline. Accepts one valid module name at a time, such as `bwa`, `lofreq`, `cohort`, or `clinical_report`. |
 | --exclude          | Excludes optional modules during full pipeline execution. Allowed values: kaiju, transmission, iqtree, clinical_report. Multiple values must be comma-separated.    |

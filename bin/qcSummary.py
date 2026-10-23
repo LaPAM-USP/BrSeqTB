@@ -14,6 +14,9 @@
 #   kaiju/<biosample>/<biosample>_kaiju_summary.csv
 #   lineage/<biosample>/<biosample>_lineage_summary.csv
 #   tbdrRCov/<biosample>/<biosample>_tbdrRcov_summary.csv   ← NOVO
+#   resistance/<biosample>/<biosample>_lofreq_damage_summary.csv   (sample damage score)
+#   resistance/<biosample>/<biosample>_oxidative_damage.csv        (calls removed as damage)
+#     → both merged into the "oxidative_damage" sheet
 #
 # [OUT]
 #   results/qc_summary.xlsx
@@ -44,6 +47,8 @@ INPUT_DIRS = {
     "kaiju":        os.path.join(PROJECT_DIR, "kaiju"),
     "lineage":      os.path.join(PROJECT_DIR, "lineage"),
     "tbdrRCov":     os.path.join(PROJECT_DIR, "tbdrRCov"),
+    "damageScore":  os.path.join(PROJECT_DIR, "resistance"),
+    "damageCalls":  os.path.join(PROJECT_DIR, "resistance"),
 }
 
 SUMMARY_SUFFIX = {
@@ -55,7 +60,20 @@ SUMMARY_SUFFIX = {
     "kaiju":       "_kaiju_summary.csv",
     "lineage":     "_lineage_summary.csv",
     "tbdrRCov":    "_tbdrRcov_summary.csv",
+    "damageScore": "_lofreq_damage_summary.csv",
+    "damageCalls": "_oxidative_damage.csv",
 }
+
+# Sample score columns first, then one row per removed call
+DAMAGE_SCORE_COLUMNS = [
+    "biosample", "status", "low_af_snvs", "low_af_damage_snvs", "damage_fraction",
+    "af_max", "min_calls", "min_fraction"
+]
+
+DAMAGE_CALL_COLUMNS = [
+    "drug", "gene", "variant", "snpeff_effect", "evidence",
+    "position", "ref", "alt", "af", "alt_reads", "caller", "filter_status", "reason"
+]
 
 KAIJU_IGNORE = {
     "cannot be assigned to a (non-viral) species",
@@ -130,6 +148,33 @@ def process_tbdr_rcov(df, biosample):
 
 
 # ============================================================
+# process oxidative damage (sample score + removed calls)
+# ============================================================
+
+def process_oxidative_damage(df_score, df_calls):
+    """One row per removed call, each carrying the sample score;
+    a single score row when the sample has no removed calls."""
+    if df_score is None or df_score.empty:
+        return None
+
+    score = df_score.iloc[0].reindex(DAMAGE_SCORE_COLUMNS)
+
+    if df_calls is not None and not df_calls.empty:
+        calls = df_calls.reindex(columns=DAMAGE_CALL_COLUMNS)
+        for col in DAMAGE_SCORE_COLUMNS:
+            calls.insert(DAMAGE_SCORE_COLUMNS.index(col), col, score[col])
+        return calls
+
+    row = score.to_dict()
+    if row["status"] == "FLAG":
+        row["reason"] = "Sample flagged; no low-AF G>T/C>A loss-of-function calls in resistance genes"
+    else:
+        row["reason"] = "Sample not flagged; no calls removed"
+
+    return pd.DataFrame([row]).reindex(columns=DAMAGE_SCORE_COLUMNS + DAMAGE_CALL_COLUMNS)
+
+
+# ============================================================
 # MAIN
 # ============================================================
 
@@ -154,6 +199,7 @@ def main():
         "kaiju": [],
         "lineage": [],
         "tbdrRCov": [],  # ← NEW
+        "oxidative_damage": [],
     }
 
     # --------------------------------------------------------
@@ -166,6 +212,13 @@ def main():
             df = read_summary_file(INPUT_DIRS[analysis], biosample, SUMMARY_SUFFIX[analysis])
             if df is not None and not df.empty:
                 tables[analysis].append(df)
+
+        # Oxidative damage (score + removed calls)
+        df_ds = read_summary_file(INPUT_DIRS["damageScore"], biosample, SUMMARY_SUFFIX["damageScore"])
+        df_dc = read_summary_file(INPUT_DIRS["damageCalls"], biosample, SUMMARY_SUFFIX["damageCalls"])
+        damage = process_oxidative_damage(df_ds, df_dc)
+        if damage is not None:
+            tables["oxidative_damage"].append(damage)
 
         # Kaiju
         df_k = read_summary_file(INPUT_DIRS["kaiju"], biosample, SUMMARY_SUFFIX["kaiju"])
@@ -201,6 +254,18 @@ def main():
                 )
             else:
                 pd.DataFrame().to_excel(writer, sheet_name=analysis, index=False)
+
+        # Oxidative damage (flagged samples first)
+        if tables["oxidative_damage"]:
+            df_od = pd.concat(tables["oxidative_damage"], ignore_index=True)
+            df_od = df_od.sort_values(
+                by=["status", "biosample"],
+                key=lambda col: col.ne("FLAG") if col.name == "status" else col,
+                kind="stable"
+            )
+            df_od.to_excel(writer, sheet_name="oxidative_damage", index=False)
+        else:
+            pd.DataFrame().to_excel(writer, sheet_name="oxidative_damage", index=False)
 
         # Kaiju
         if tables["kaiju"]:
