@@ -10,7 +10,7 @@
 # - LoFreq call-parallel is used for within-sample parallelization
 # - Indel qualities are added before variant calling for INDEL support
 # - Final variants are filtered by AF >= min_af
-# - Default min_af is 0.05
+# - Default min_af is 0.00 (no AF filter; set via params.lofreqMinAf)
 # ============================================================
 
 export LC_ALL=C
