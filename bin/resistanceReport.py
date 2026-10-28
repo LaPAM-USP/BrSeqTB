@@ -15,7 +15,7 @@
 #   results/resistance/<biosample ID>.xlsx
 #       → Final deduplicated and curated resistance report
 #   resistance/<biosample ID>/<biosample ID>_oxidative_damage.csv
-#       → Calls removed as oxidative damage, with the reason (only written
+#       → Calls flagged as oxidative damage, with the reason (only written
 #         when there are any; read by qcSummary.py)
 #
 # Rules:
@@ -29,9 +29,9 @@
 #         GATK > NORM > LOFREQ > DELLY
 #   5. Evidence values converted to:
 #         R / r / u / s / S
-#   6. Calls failing with OXIDATIVE_DAMAGE_SUSPECT (low-AF G>T / C>A
-#      loss of function in a damage-flagged sample) are removed from the
-#      report and written to the oxidative damage QC file instead.
+#   6. Calls with OXIDATIVE_DAMAGE_SUSPECT in damage_flag (low-AF G>T / C>A
+#      loss of function in a damage-flagged sample) stay in the report
+#      with the flag, and are also written to the oxidative damage QC file.
 #
 # ============================================================
 
@@ -52,14 +52,14 @@ CALLER_PRIORITY = ["gatk", "norm", "lofreq", "delly"]
 FINAL_COLUMNS = [
     "drug","gene","tier","variant","effect","evidence","comment",
     "af","alt_reads","heteroresistance",
-    "filter_status","filter_method","caller"
+    "filter_status","filter_method","damage_flag","caller"
 ]
 
-DAMAGE_STATUS = "OXIDATIVE_DAMAGE_SUSPECT"
+DAMAGE_FLAG = "OXIDATIVE_DAMAGE_SUSPECT"
 
 DAMAGE_COLUMNS = [
     "biosample","drug","gene","variant","snpeff_effect","evidence",
-    "position","ref","alt","af","alt_reads","caller","filter_status","reason"
+    "position","ref","alt","af","alt_reads","caller","filter_status","damage_flag","reason"
 ]
 
 EVIDENCE_MAP = {
@@ -245,7 +245,7 @@ def resolve_variant(df):
 
 def damage_reason(row, profile):
 
-    # Why a call was removed as oxidative damage
+    # Why a call was flagged as oxidative damage
     try:
         af_txt = f"{float(row['af']):.1%}"
     except (TypeError, ValueError):
@@ -265,25 +265,25 @@ def damage_reason(row, profile):
     return reason
 
 
-def write_damage_qc(biosample, removed):
+def write_damage_qc(biosample, flagged):
 
-    # Calls removed as oxidative damage → resistance/<biosample>/<biosample>_oxidative_damage.csv
+    # Calls flagged as oxidative damage → resistance/<biosample>/<biosample>_oxidative_damage.csv
     damage_csv = INPUT_DIR / biosample / f"{biosample}_oxidative_damage.csv"
 
-    if removed.empty:
+    if flagged.empty:
         damage_csv.unlink(missing_ok=True)
         return
 
     profile_csv = INPUT_DIR / biosample / f"{biosample}_lofreq_damage_summary.csv"
     profile = pd.read_csv(profile_csv).iloc[0] if profile_csv.exists() else None
 
-    removed = removed.copy()
-    removed["biosample"] = biosample
-    removed["reason"] = removed.apply(lambda row: damage_reason(row, profile), axis=1)
+    flagged = flagged.copy()
+    flagged["biosample"] = biosample
+    flagged["reason"] = flagged.apply(lambda row: damage_reason(row, profile), axis=1)
 
-    removed[DAMAGE_COLUMNS].to_csv(damage_csv, index=False)
+    flagged[DAMAGE_COLUMNS].to_csv(damage_csv, index=False)
 
-    print(f"[OK] {len(removed)} oxidative damage call(s) moved to QC → {damage_csv}")
+    print(f"[OK] {len(flagged)} oxidative damage call(s) flagged → {damage_csv}")
 
 # ============================================================
 # CORE PROCESS
@@ -335,6 +335,7 @@ def process_biosample(biosample):
     df["caller"]   = df["caller"]
     df["filter_status"] = df["filter_status"]
     df["filter_method"] = df["filter_method"]
+    df["damage_flag"] = df["damage_flag"].fillna("") if "damage_flag" in df.columns else ""
 
     # ===================== DEDUPLICATION =====================
 
@@ -349,11 +350,11 @@ def process_biosample(biosample):
     deduplicated = deduplicate_variants(df)
 
     # ===================== OXIDATIVE DAMAGE =====================
-    # Removed from the report; listed in qc_summary instead
-    is_damage = deduplicated["filter_status"].astype(str).str.contains(DAMAGE_STATUS)
+    # Kept in the report with damage_flag; also listed in qc_summary
+    is_damage = deduplicated["damage_flag"] == DAMAGE_FLAG
     write_damage_qc(biosample, deduplicated[is_damage])
 
-    final = deduplicated[~is_damage][FINAL_COLUMNS]
+    final = deduplicated[FINAL_COLUMNS]
 
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
     final.to_excel(output_xlsx, index=False)

@@ -260,11 +260,13 @@ def process_resistance(biosample):
     variants_by_drug = defaultdict(list)
     hetero = []
     borderline = []
+    damage = []
 
     for _, row in df_pass.iterrows():
         var = row["variant"]
         drug = row["drug"]
         het = str(row["heteroresistance"]).upper() == "HET"
+        damaged = str(row.get("damage_flag", "")).strip() == "OXIDATIVE_DAMAGE_SUSPECT"
         comment = row["comment"].strip()
 
         idx = None
@@ -288,6 +290,10 @@ def process_resistance(biosample):
             suffix += "†"
             borderline.append(var)
 
+        if damaged:
+            suffix += "‡"
+            damage.append(var)
+
         if idx:
             suffix += superscript(idx)
 
@@ -306,7 +312,7 @@ def process_resistance(biosample):
     df_fail = df_r[df_r["filter_status"] != "PASS"]
     fail_filters = ", ".join(df_fail["variant"]) if not df_fail.empty else ""
 
-    return trad_r, trad_s, var_str, comentarios, hetero, borderline, fail_filters, trad
+    return trad_r, trad_s, var_str, comentarios, hetero, borderline, damage, fail_filters, trad
 
 # ============================================================
 # GENERATE WORD REPORT
@@ -317,13 +323,19 @@ def gerar_laudo_word(biosample, input_table):
     df = read_input_table(input_table)
     row = df[df["Biosample"] == biosample].iloc[0]
 
-    FARMACOS_R, FARMACOS_S, VAR_RESISTENCIA, COMENTARIOS, hetero, bl, flt, trad = process_resistance(biosample)
+    FARMACOS_R, FARMACOS_S, VAR_RESISTENCIA, COMENTARIOS, hetero, bl, dmg, flt, trad = process_resistance(biosample)
 
     obs = ["Observações:"]
     if hetero:
         obs.append("ʰ Heterorresistência: " + ", ".join(hetero))
     if bl:
         obs.append("† Mutações do tipo borderline: " + ", ".join(bl))
+    if dmg:
+        obs.append(
+            "‡ Suspeita de artefato por dano oxidativo do DNA (8-oxoG): " + ", ".join(dmg)
+            + ". Recomenda-se repetir o sequenciamento a partir de nova biblioteca"
+            " ou realizar teste de sensibilidade fenotípico."
+        )
     if flt:
         obs.append("Falharam nos filtros de qualidade: " + flt)
 

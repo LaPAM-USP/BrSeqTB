@@ -366,9 +366,14 @@ Libraries with oxidative DNA damage (8-oxoG) produce many low-frequency G>T / C>
 
 * **Score:** PASS SNVs with AF < `0.05`, and how many of them are G>T or C>A.
 * **Flag:** the sample is flagged when at least `200` of those SNVs are G>T / C>A **and** they make up at least `80%` of them.
-* **Effect:** in flagged samples only, LoFreq SNVs with AF < `0.05` that are G>T / C>A **and** that snpEff annotates as loss of function (`stop_gained` or `start_lost`) get `OXIDATIVE_DAMAGE_SUSPECT` in `filter_status`. These calls are removed from the per-isolate tables (`results/resistance/<biosample>.xlsx`), the resistance summary and the clinical report, and are listed with the reason in the `oxidative_damage` sheet of `results/qc_summary.xlsx`. Missense, synonymous and non-coding G>T / C>A calls, and all calls in unflagged samples, follow the normal filters.
+* **Effect:** in flagged samples only, LoFreq SNVs with AF < `0.05` that are G>T / C>A **and** that snpEff annotates as loss of function (`stop_gained` or `start_lost`) get `OXIDATIVE_DAMAGE_SUSPECT` in a separate `damage_flag` column. The flag does not change `filter_status`, so these calls are not filtered: they stay in the per-isolate tables (`results/resistance/<biosample>.xlsx`), the resistance summary and the clinical report, and are marked as suspect in each of them:
+  * **Per-isolate table:** `damage_flag` column.
+  * **Resistance summary:** the variant annotation ends in `_oxidativeDamage`, and the `damage_flag` column lists the sample's suspect variants.
+  * **Clinical report:** the variant is marked `‡`, with a note under *Observações* recommending re-sequencing from a new library or phenotypic DST.
 
-The `oxidative_damage` sheet holds the whole check: every sample's score and FLAG/PASS status, and for flagged samples one row per removed call with the reason. Its sources are `resistance/<biosample>/<biosample>_lofreq_damage_summary.csv` (score) and `resistance/<biosample>/<biosample>_oxidative_damage.csv` (removed calls). A flagged sample should be re-sequenced from a new library. Thresholds are set at the top of `bin/resistanceTarget.py` (`DAMAGE_AF_MAX`, `DAMAGE_MIN_CALLS`, `DAMAGE_MIN_FRACTION`, `DAMAGE_LOF_EFFECTS`).
+  They are also listed with the reason in the `oxidative_damage` sheet of `results/qc_summary.xlsx`. Missense, synonymous and non-coding G>T / C>A calls, and all calls in unflagged samples, are not flagged.
+
+The `oxidative_damage` sheet holds the whole check: every sample's score and FLAG/PASS status, and for flagged samples one row per flagged call with the reason. Its sources are `resistance/<biosample>/<biosample>_lofreq_damage_summary.csv` (score) and `resistance/<biosample>/<biosample>_oxidative_damage.csv` (flagged calls). A flagged sample should be re-sequenced from a new library. Thresholds are set at the top of `bin/resistanceTarget.py` (`DAMAGE_AF_MAX`, `DAMAGE_MIN_CALLS`, `DAMAGE_MIN_FRACTION`, `DAMAGE_LOF_EFFECTS`).
 
 > ⚠ **Important — Module Dependencies:**
 > Although modules can be executed individually, they **respect the logical dependencies defined in the workflow DAG**.

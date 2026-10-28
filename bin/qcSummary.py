@@ -15,7 +15,7 @@
 #   lineage/<biosample>/<biosample>_lineage_summary.csv
 #   tbdrRCov/<biosample>/<biosample>_tbdrRcov_summary.csv   ← NOVO
 #   resistance/<biosample>/<biosample>_lofreq_damage_summary.csv   (sample damage score)
-#   resistance/<biosample>/<biosample>_oxidative_damage.csv        (calls removed as damage)
+#   resistance/<biosample>/<biosample>_oxidative_damage.csv        (calls flagged as damage)
 #     → both merged into the "oxidative_damage" sheet
 #
 # [OUT]
@@ -64,7 +64,7 @@ SUMMARY_SUFFIX = {
     "damageCalls": "_oxidative_damage.csv",
 }
 
-# Sample score columns first, then one row per removed call
+# Sample score columns first, then one row per flagged call
 DAMAGE_SCORE_COLUMNS = [
     "biosample", "status", "low_af_snvs", "low_af_damage_snvs", "damage_fraction",
     "af_max", "min_calls", "min_fraction"
@@ -72,7 +72,7 @@ DAMAGE_SCORE_COLUMNS = [
 
 DAMAGE_CALL_COLUMNS = [
     "drug", "gene", "variant", "snpeff_effect", "evidence",
-    "position", "ref", "alt", "af", "alt_reads", "caller", "filter_status", "reason"
+    "position", "ref", "alt", "af", "alt_reads", "caller", "filter_status", "damage_flag", "reason"
 ]
 
 KAIJU_IGNORE = {
@@ -148,12 +148,12 @@ def process_tbdr_rcov(df, biosample):
 
 
 # ============================================================
-# process oxidative damage (sample score + removed calls)
+# process oxidative damage (sample score + flagged calls)
 # ============================================================
 
 def process_oxidative_damage(df_score, df_calls):
-    """One row per removed call, each carrying the sample score;
-    a single score row when the sample has no removed calls."""
+    """One row per flagged call, each carrying the sample score;
+    a single score row when the sample has no flagged calls."""
     if df_score is None or df_score.empty:
         return None
 
@@ -169,7 +169,7 @@ def process_oxidative_damage(df_score, df_calls):
     if row["status"] == "FLAG":
         row["reason"] = "Sample flagged; no low-AF G>T/C>A loss-of-function calls in resistance genes"
     else:
-        row["reason"] = "Sample not flagged; no calls removed"
+        row["reason"] = "Sample not flagged; no calls flagged"
 
     return pd.DataFrame([row]).reindex(columns=DAMAGE_SCORE_COLUMNS + DAMAGE_CALL_COLUMNS)
 
@@ -213,7 +213,7 @@ def main():
             if df is not None and not df.empty:
                 tables[analysis].append(df)
 
-        # Oxidative damage (score + removed calls)
+        # Oxidative damage (score + flagged calls)
         df_ds = read_summary_file(INPUT_DIRS["damageScore"], biosample, SUMMARY_SUFFIX["damageScore"])
         df_dc = read_summary_file(INPUT_DIRS["damageCalls"], biosample, SUMMARY_SUFFIX["damageCalls"])
         damage = process_oxidative_damage(df_ds, df_dc)
