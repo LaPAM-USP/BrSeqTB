@@ -52,7 +52,8 @@ VCF_CALLERS = {
 # A sample is flagged when its low-AF LoFreq SNVs are dominated by
 # G>T / C>A. In flagged samples only, low-AF G>T / C>A LoFreq calls
 # that snpEff annotates as loss of function (stop gained / start lost)
-# fail filtering instead of driving an R/r interpretation.
+# are flagged as OXIDATIVE_DAMAGE_SUSPECT in damage_flag. The flag
+# does not change filter_status; the call stays in every report.
 # Missense, synonymous and non-coding calls are not affected.
 # ------------------------------------------------------------
 DAMAGE_AF_MAX = 0.05
@@ -60,6 +61,7 @@ DAMAGE_MIN_CALLS = 200
 DAMAGE_MIN_FRACTION = 0.80
 DAMAGE_SUBSTITUTIONS = {("G", "T"), ("C", "A")}
 DAMAGE_LOF_EFFECTS = {"stop_gained", "start_lost"}
+DAMAGE_FLAG = "OXIDATIVE_DAMAGE_SUSPECT"
 
 # ============================================================
 # FILTER HELPERS
@@ -145,7 +147,23 @@ def is_lof_effect(effect):
     return any(term in DAMAGE_LOF_EFFECTS for term in str(effect).split("&"))
 
 
-def lofreq_failures(filter_vcf, alt_reads, total_depth, ref=None, alt=None, af=None, effect=None, sample_damaged=False):
+def damage_flag(caller, ref, alt, af, effect, sample_damaged):
+
+    # Low-AF G>T / C>A LoFreq loss of function in a sample flagged for oxidative damage
+    if (
+        caller == "lofreq"
+        and sample_damaged
+        and is_damage_type(ref, alt)
+        and is_lof_effect(effect)
+        and not is_missing(af)
+        and af < DAMAGE_AF_MAX
+    ):
+        return DAMAGE_FLAG
+
+    return ""
+
+
+def lofreq_failures(filter_vcf, alt_reads, total_depth):
 
     failures = []
 
@@ -158,16 +176,6 @@ def lofreq_failures(filter_vcf, alt_reads, total_depth, ref=None, alt=None, af=N
     dp = total_depth if not is_missing(total_depth) else 0
     if dp < 10:
         failures.append("DP_FAIL")
-
-    # Low-AF G>T / C>A loss of function in a sample flagged for oxidative damage
-    if (
-        sample_damaged
-        and is_damage_type(ref, alt)
-        and is_lof_effect(effect)
-        and not is_missing(af)
-        and af < DAMAGE_AF_MAX
-    ):
-        failures.append("OXIDATIVE_DAMAGE_SUSPECT")
 
     return failures
 
@@ -189,11 +197,7 @@ def define_filter_status(
     alt_reads,
     total_depth,
     filter_vcf,
-    filter_df=None,
-    ref=None,
-    alt=None,
-    effect=None,
-    sample_damaged=False
+    filter_df=None
 ):
 
     # ========================================================
@@ -223,19 +227,13 @@ def define_filter_status(
     # ========================================================
     # LOFREQ
     # Needs PASS in VCF FILTER and at least 3 ALT reads.
-    # In damage-flagged samples, low-AF G>T / C>A loss of function also fails.
     # ========================================================
     if caller == "lofreq":
 
         per_sample_fails = lofreq_failures(
             filter_vcf=filter_vcf,
             alt_reads=alt_reads,
-            total_depth=total_depth,
-            ref=ref,
-            alt=alt,
-            af=af,
-            effect=effect,
-            sample_damaged=sample_damaged
+            total_depth=total_depth
         )
 
         if per_sample_fails:
@@ -443,12 +441,10 @@ def recover_annotation(vcf_file, caller, sample_damaged=False):
                 alt_reads=ar,
                 total_depth=Total_depth,
                 filter_vcf=filter_vcf,
-                filter_df=filter_df,
-                ref=ref,
-                alt=alt,
-                effect=effect,
-                sample_damaged=sample_damaged
+                filter_df=filter_df
             )
+
+            flag = damage_flag(caller, ref, alt, af, effect, sample_damaged)
 
             annotations.append([
                 position,
@@ -464,6 +460,7 @@ def recover_annotation(vcf_file, caller, sample_damaged=False):
                 qual,
                 filter_status,
                 filter_method,
+                flag,
                 caller
             ])
 
@@ -481,6 +478,7 @@ def recover_annotation(vcf_file, caller, sample_damaged=False):
         "qual",
         "filter_status",
         "filter_method",
+        "damage_flag",
         "caller",
     ])
 
@@ -782,6 +780,7 @@ def main():
             "qual",
             "filter_status",
             "filter_method",
+            "damage_flag",
             "caller",
         ]
 
