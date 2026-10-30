@@ -53,7 +53,8 @@ VCF_CALLERS = {
 # G>T / C>A. In flagged samples only, low-AF G>T / C>A LoFreq calls
 # that snpEff annotates as loss of function (stop gained / start lost)
 # are flagged as OXIDATIVE_DAMAGE_SUSPECT in damage_flag. The flag
-# does not change filter_status; the call stays in every report.
+# does not change filter_status and is only reported in qc_summary;
+# the call stays in every report as a normal call.
 # Missense, synonymous and non-coding calls are not affected.
 # ------------------------------------------------------------
 DAMAGE_AF_MAX = 0.05

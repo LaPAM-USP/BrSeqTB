@@ -30,8 +30,9 @@
 #   5. Evidence values converted to:
 #         R / r / u / s / S
 #   6. Calls with OXIDATIVE_DAMAGE_SUSPECT in damage_flag (low-AF G>T / C>A
-#      loss of function in a damage-flagged sample) stay in the report
-#      with the flag, and are also written to the oxidative damage QC file.
+#      loss of function in a damage-flagged sample) stay in the report as
+#      normal calls (no flag column) and are written to the oxidative damage
+#      QC file.
 #
 # ============================================================
 
@@ -52,7 +53,7 @@ CALLER_PRIORITY = ["gatk", "norm", "lofreq", "delly"]
 FINAL_COLUMNS = [
     "drug","gene","tier","variant","effect","evidence","comment",
     "af","alt_reads","heteroresistance",
-    "filter_status","filter_method","damage_flag","caller"
+    "filter_status","filter_method","caller"
 ]
 
 DAMAGE_FLAG = "OXIDATIVE_DAMAGE_SUSPECT"
@@ -350,7 +351,7 @@ def process_biosample(biosample):
     deduplicated = deduplicate_variants(df)
 
     # ===================== OXIDATIVE DAMAGE =====================
-    # Kept in the report with damage_flag; also listed in qc_summary
+    # Kept in the report as normal calls; listed only in qc_summary
     is_damage = deduplicated["damage_flag"] == DAMAGE_FLAG
     write_damage_qc(biosample, deduplicated[is_damage])
 
