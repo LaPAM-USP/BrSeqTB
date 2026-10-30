@@ -14,8 +14,6 @@
 #   - Only PASS variants
 #   - Read curated variants (already deduplicated/MNP-corrected)
 #   - annotation format:  Variant_flagX
-#     (Variant_flagX_oxidativeDamage when damage_flag is set)
-#   - damage_flag column lists the sample's oxidative-damage-suspect variants
 #   - phenotype R/r/u/s/S
 #   - drug columns interleaved with annotation columns
 # ============================================================
@@ -49,9 +47,6 @@ patterns = {
     "S": "flagnR"
 }
 
-DAMAGE_FLAG = "OXIDATIVE_DAMAGE_SUSPECT"
-DAMAGE_SUFFIX = "_oxidativeDamage"
-
 def determine_final_resistance(string):
     """Return phenotype based on annotation flags."""
     if "flagR" in string:
@@ -84,21 +79,12 @@ def process_biosample(biosample):
     # --------------------------------------------------------
     df = df[df["filter_status"] == "PASS"]
     if df.empty:
-        return {"biosample": biosample, "damage_flag": ""}
+        return {"biosample": biosample}
 
     # Drugs appear already as normalized strings in CAPITAL/LOWER policy
     drugs = sorted(df["drug"].dropna().unique())
 
     result = {"biosample": biosample}
-
-    # Oxidative-damage-suspect variants (kept, but flagged)
-    if "damage_flag" in df.columns:
-        is_damage = df["damage_flag"] == DAMAGE_FLAG
-    else:
-        is_damage = pd.Series(False, index=df.index)
-
-    damaged = sorted(set(df.loc[is_damage, "variant"].dropna().astype(str).str.strip()))
-    result["damage_flag"] = ",".join(damaged)
 
     # ========================================================
     # Build phenotype and annotation per drug
@@ -123,8 +109,6 @@ def process_biosample(biosample):
             variant = str(variant).strip()
 
             annot = f"{variant}_{flag_code}"
-            if is_damage[row.name]:
-                annot += DAMAGE_SUFFIX
             annotations.append(annot)
 
         # Remove duplicates
@@ -173,7 +157,7 @@ def main():
     # ORDER COLUMNS — biosample + interleaved drug/annotation
     # ============================================================
 
-    fixed_cols = ["biosample", "damage_flag"]
+    fixed_cols = ["biosample"]
 
     drug_cols = sorted([
         c for c in df.columns
@@ -191,7 +175,7 @@ def main():
     
     # Fill empty phenotype cells with "S", but do not touch annotation columns
     for col in df.columns:
-        if col not in fixed_cols and not col.endswith("_annotation"):
+        if col != "biosample" and not col.endswith("_annotation"):
             df[col] = df[col].replace("", "S")
 
 
