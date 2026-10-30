@@ -47,7 +47,7 @@ dependencies:
   # =========================
   # QC / phylogeny / taxonomy
   # =========================
-  - fastqc
+  - fastqc=0.12.1
   - trimmomatic
   - iqtree
   - kaiju
